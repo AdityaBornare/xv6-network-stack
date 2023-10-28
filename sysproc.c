@@ -89,3 +89,11 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+int
+sys_test(void) 
+{
+  cprintf("Inside the kernel\n");
+  return 0;
+}
+
