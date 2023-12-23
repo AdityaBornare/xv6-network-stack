@@ -94,6 +94,7 @@ int
 sys_test(void) 
 {
   cprintf("Inside the kernel\n");
+  nicinit();
   return 0;
 }
 
