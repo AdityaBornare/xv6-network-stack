@@ -50,29 +50,9 @@ struct RTL8139_registers {
   uchar MediaStatus;            // 0x58
   uchar config3;                // 0x59
   uchar Config4;                // 0x5A
-}
+};
 
 struct RTL8139_registers *regs;
-
-static inline uint readl(uint addr) {
-    volatile uint *ptr = (volatile uint*)addr;
-    return *ptr;
-}
-
-static inline void writel(uint addr, uint val) {
-    volatile uint *ptr = (volatile uint*)addr;
-    *ptr = val;
-}
-
-static inline uchar readb(uint addr) {
-    volatile uchar *ptr = (volatile uchar*)addr;
-    return *ptr;
-}
-
-static inline void writeb(uint addr, uchar val) {
-    volatile uchar *ptr = (volatile uchar*)addr;
-    *ptr = val;
-}
 
 uint read_pci_config_register(uchar bus, uchar device, uchar function, uchar offset) {
   uint address = (1 << 31) |   // Enable bit
@@ -113,20 +93,20 @@ void nicinit() {
   write_pci_config_register(0, i, 0, 0x4, read_pci_config_register(0, i, 0, 0x4) | 0x7);
 
   // Set base address for memory mapped io
-  ioaddr = (struct RTL8139_registers*) read_pci_config_register(0, i, 0, 0x14);
+  regs = (struct RTL8139_registers*) read_pci_config_register(0, i, 0, 0x14);
 
   // Software reset
-  writeb(ioaddr + 0x37, 0x10);
+  regs->Cmd = 0x10;
 
   // Check that the chip has finished the reset
   int j;
-  for (j = 5000000; j > 0; j--) {
-    if ((readb(ioaddr + 0x37) & 0x10) == 0){
+  for (j = 1000; j > 0; j--) {
+    if ((regs->Cmd & 0x10) == 0){
       break;
     }
   }
   cprintf("%d\n", j);
-  cprintf("%x\n", readb(ioaddr + 0x37));
+  cprintf("%x\n", regs->Cmd);
 }
 
 /*
