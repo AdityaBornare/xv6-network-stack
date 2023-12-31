@@ -2,9 +2,23 @@
 #include "defs.h"
 #include "x86.h"
 
-#define RX_BUF_LEN 8192;
+#define TX_FIFO_THRESH 256	      // In bytes, rounded down to 32 byte units
+#define RX_FIFO_THRESH 4          // Rx buffer level before first PCI xfer
+#define RX_DMA_BURST 4            // Calculate as 16 << 4 = 256 bytes
+#define TX_DMA_BURST 4            // Calculate as 16 << 4 = 256 bytes
+#define NUM_TX_DESC	4             // Number of Tx descriptor registers
+#define RX_BUF_LEN_IDX 0          // 0, 1, 2 is allowed - 8k ,16k ,32K rx buffer
 
-// static unsigned char rx_ring[RX_BUF_LEN + 16] __attribute__((__aligned__(4)));
+#define RX_BUF_LEN (8192 << RX_BUF_LEN_IDX)
+
+#define RTL_REG_RXCONFIG_ACCEPTBROADCAST 0x08
+#define RTL_REG_RXCONFIG_ACCEPTMULTICAST 0x04
+#define RTL_REG_RXCONFIG_ACCEPTMYPHYS 0x02
+#define RTL_REG_RXCONFIG_ACCEPTALLPHYS 0x01
+
+static unsigned char rx_ring[RX_BUF_LEN + 16] __attribute__((__aligned__(4)));
+
+const uint rx_config = (RX_BUF_LEN_IDX << 11) | (RX_FIFO_THRESH << 13) | (RX_DMA_BURST << 8);
 
 struct RTL8139_registers {
   uchar IDR0;                   // 0x00
@@ -42,7 +56,7 @@ struct RTL8139_registers {
   uint RxConfig;                // 0x44 - 0x47
   uint TimerCount;              // 0x48 - 0x4B
   uint MissedPacketCounter;     // 0x4C - 0x4F
-  uchar Cmd9346;                // 0x50
+  uchar Cfg9346;                // 0x50
   uchar Config0;                // 0x51
   uchar Config1;                // 0x52
   uchar reserved1;              // 0x53
@@ -50,6 +64,25 @@ struct RTL8139_registers {
   uchar MediaStatus;            // 0x58
   uchar config3;                // 0x59
   uchar Config4;                // 0x5A
+};
+
+enum CmdBits {
+  RxBufEmpty = 0x01,
+  CmdTxEnb   = 0x04,
+  CmdRxEnb   = 0x08,
+  CmdReset   = 0x10,
+};
+
+enum IntrStatusBits {
+  RxOK       = 0x0001,
+  RxErr      = 0x0002,
+  TxOK       = 0x0004,
+  TxErr      = 0x0008,
+  RxOverflow = 0x0010,
+  RxUnderrun = 0x0020,
+  RxFIFOOver = 0x0040,
+  PCSTimeout = 0x4000,
+  PCIErr     = 0x8000,
 };
 
 struct RTL8139_registers *regs;
@@ -82,7 +115,15 @@ void write_pci_config_register(uchar bus, uchar device, uchar function, uchar of
   outl(0xcfc, data);
 }
 
-void nicinit() {
+void rtl8139_set_rx_mode() {
+  uint rx_mode = RTL_REG_RXCONFIG_ACCEPTBROADCAST | RTL_REG_RXCONFIG_ACCEPTMULTICAST | RTL_REG_RXCONFIG_ACCEPTMYPHYS;
+  regs->RxConfig = rx_config | rx_mode;
+  *((uint*)&regs->MAR0) = 0xffffffff;
+  *((uint*)&regs->MAR4) = 0xffffffff;
+}
+
+void rtl8139_nicinit() {
+  // Search in PCI configuration space
   int i = 0;
   for(i = 0; i < 32; i++) {
     if(read_pci_config_register(0, i, 0, 0) == 0x813910ec)
@@ -94,19 +135,43 @@ void nicinit() {
 
   // Set base address for memory mapped io
   regs = (struct RTL8139_registers*) read_pci_config_register(0, i, 0, 0x14);
+  
+  // Set the LWAKE + LWPTN to active high. This should essentially 'power on' the device. 
+  regs->Config1 = 0x0;
 
   // Software reset
-  regs->Cmd = 0x10;
+  regs->Cmd = CmdReset;
 
   // Check that the chip has finished the reset
-  int j;
-  for (j = 1000; j > 0; j--) {
+  for (int j = 1000; j > 0; j--) {
     if ((regs->Cmd & 0x10) == 0){
       break;
     }
   }
-  cprintf("%d\n", j);
-  cprintf("%x\n", regs->Cmd);
+
+  // Change operating mode before writing to config registers
+  regs->Cfg9346 =  0xC0;
+  
+  // Set the RE and TE bits in command register before setting transfer thresholds
+  regs->Cmd = CmdTxEnb | CmdRxEnb;
+  
+  // Set transfer thresholds (accept no frames yet!)
+  regs->RxConfig = rx_config;
+  regs->TxConfig = (TX_DMA_BURST << 8) | 0x03000000;
+  
+  // Change operating mode back to the normal network communication mode
+  regs->Cfg9346 = 0x00;
+
+  // Initialize rx buffer
+  regs->RxBufStart = (uint)rx_ring;
+
+  // Start the chip's Tx and Rx process
+  regs->MissedPacketCounter = 0;
+  rtl8139_set_rx_mode();
+  regs->Cmd = CmdTxEnb | CmdRxEnb;
+
+  // Enable all known interrupts by setting the interrupt mask
+  regs->IMR = PCIErr | PCSTimeout | RxUnderrun | RxOverflow | RxFIFOOver | TxErr | TxOK | RxErr | RxOK;
 }
 
 /*

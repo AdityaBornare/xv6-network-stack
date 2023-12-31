@@ -94,7 +94,7 @@ int
 sys_test(void) 
 {
   cprintf("Inside the kernel\n");
-  nicinit();
+  rtl8139_nicinit();
   return 0;
 }
 

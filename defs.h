@@ -122,7 +122,7 @@ void            wakeup(void*);
 void            yield(void);
 
 // rtl8139.c
-void nicinit();
+void rtl8139_nicinit();
 
 // swtch.S
 void            swtch(struct context**, struct context*);
