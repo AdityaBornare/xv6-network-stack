@@ -11,6 +11,9 @@
 
 #define RX_BUF_LEN (8192 << RX_BUF_LEN_IDX)
 
+#define RX_MAX_PKT_LENGTH 1024    // Correct this later
+#define RX_MIN_PKT_LENGTH 0       // Correct this later
+
 #define RTL_REG_RXCONFIG_ACCEPTBROADCAST 0x08
 #define RTL_REG_RXCONFIG_ACCEPTMULTICAST 0x04
 #define RTL_REG_RXCONFIG_ACCEPTMYPHYS 0x02
@@ -19,6 +22,10 @@
 static unsigned char rx_ring[RX_BUF_LEN + 16] __attribute__((__aligned__(4)));
 
 const uint rx_config = (RX_BUF_LEN_IDX << 11) | (RX_FIFO_THRESH << 13) | (RX_DMA_BURST << 8);
+
+static uchar cur_rx;
+static uchar packets_received_good;
+static uchar byte_received;
 
 struct RTL8139_registers {
   uchar IDR0;                   // 0x00
@@ -83,6 +90,18 @@ enum IntrStatusBits {
   RxFIFOOver = 0x0040,
   PCSTimeout = 0x4000,
   PCIErr     = 0x8000,
+};
+
+enum PacketHeader {
+	ROK       = 0x0001,
+	FAErr     = 0x0002,
+	CRC        = 0x0003,
+	LongPkt    = 0x0004,
+	RUNT       = 0x0005,
+	ISE        = 0x0006,
+	BAR        = 0x0200,
+	PAM        = 0x0400,
+	MAR        = 0x0800,
 };
 
 struct RTL8139_registers *regs;
@@ -172,10 +191,73 @@ void rtl8139_nicinit() {
 
   // Enable all known interrupts by setting the interrupt mask
   regs->IMR = PCIErr | PCSTimeout | RxUnderrun | RxOverflow | RxFIFOOver | TxErr | TxOK | RxErr | RxOK;
+
+	//cur_rx set to 0
+	cur_rx = 0;
+}
+
+int rtl8139_packetOK() {
+	
+	int bad_packet = (regs->ISR & RUNT) || (regs->ISR & LongPkt) || (regs->ISR & CRC) || (regs->ISR & FAErr);
+  
+  uint ring_offset = cur_rx % RX_BUF_LEN;	
+	unsigned long rx_status =  *(unsigned long* )(rx_ring + ring_offset);
+	uint rx_size = rx_status >> 16;     // Includes CRC
+
+	int pkt_size = rx_size - 4;
+
+	if(!bad_packet && (regs->ISR & ROK)) {
+     
+	  if(pkt_size > RX_MAX_PKT_LENGTH || rx_size < RX_MIN_PKT_LENGTH) {
+		  
+		  return 0;
+		}
+
+	  packets_received_good++;
+	  byte_received = pkt_size;
+	  
+		return 1;
+	}
+
+  else
+	  return 0;
+
 }
 
 /*
-void nicinit() {
+int rtl8139_rx_interrupt_handler() {
+  
+  uchar tmpCmd;
+	uint pkt_length;
+	uchar *p_income_pkt, *rx_read_ptr;
+  uint rx_read_ptr_offset = cur_rx % RX_BUF_LEN;
+
+	unsigned long rx_status =  *(unsigned long* )(rx_ring + rx_read_ptr_offset);
+  uint rx_size = rx_status >> 16;     // Includes CRC
+
+  pkt_length = rx_size - 4;
+
+	while(1){
+	  
+		tmpCmd = regs->Cmd;
+
+		if(tmpCmd & ) 
+			break;
+
+	}
+	do {
+	  rx_read_ptr = rx_ring + rx_read_ptr_offset;
+		p_income_pkt = rx_read_ptr + 4;
+		
+		if(rtl8139_packetOK()){
+		  	
+		}
+	}while(!tmpCmd);
+} //Incomplete
+
+*/
+/*
+void n1icinit() {
   int i;
   for(i = 0; i < 32; i++) {
     if(read_pci_config_register(0, i, 0, 0) == 0x813910ec)
