@@ -201,7 +201,7 @@ int rtl8139_packetOK() {
 	int bad_packet = (regs->ISR & RUNT) || (regs->ISR & LongPkt) || (regs->ISR & CRC) || (regs->ISR & FAErr);
   
   uint ring_offset = cur_rx % RX_BUF_LEN;	
-	unsigned long rx_status =  *(unsigned long* )(rx_ring + ring_offset);
+	uint rx_status =  *(uint* )(rx_ring + ring_offset);
 	uint rx_size = rx_status >> 16;     // Includes CRC
 
 	int pkt_size = rx_size - 4;
@@ -256,8 +256,9 @@ int rtl8139_rx_interrupt_handler() {
 } //Incomplete
 
 */
+
 /*
-void n1icinit() {
+void nicinit() {
   int i;
   for(i = 0; i < 32; i++) {
     if(read_pci_config_register(0, i, 0, 0) == 0x813910ec)
