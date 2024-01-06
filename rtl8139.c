@@ -7,7 +7,12 @@
 #define RX_DMA_BURST 4            // Calculate as 16 << 4 = 256 bytes
 #define TX_DMA_BURST 4            // Calculate as 16 << 4 = 256 bytes
 #define NUM_TX_DESC	4             // Number of Tx descriptor registers
+#define ETH_FRAME_LEN	1514	/* Max. octets in frame sans FCS */
+#define TX_BUF_SIZE	ETH_FRAME_LEN
+#define ETH_ZLEN	60	/* Min. octets in frame sans FCS */
 #define RX_BUF_LEN_IDX 0          // 0, 1, 2 is allowed - 8k ,16k ,32K rx buffer
+#define RTL_TIMEOUT 100000
+#define ETIMEDOUT 110  		  //connection timed out
 
 #define RX_BUF_LEN (8192 << RX_BUF_LEN_IDX)
 
@@ -16,7 +21,9 @@
 #define RTL_REG_RXCONFIG_ACCEPTMYPHYS 0x02
 #define RTL_REG_RXCONFIG_ACCEPTALLPHYS 0x01
 
+static unsigned char tx_buffer[TX_BUF_SIZE] __attribute__((__aligned__(4)));
 static unsigned char rx_ring[RX_BUF_LEN + 16] __attribute__((__aligned__(4)));
+unsigned int cur_tx;
 
 const uint rx_config = (RX_BUF_LEN_IDX << 11) | (RX_FIFO_THRESH << 13) | (RX_DMA_BURST << 8);
 
@@ -122,25 +129,10 @@ void rtl8139_set_rx_mode() {
   *((uint*)&regs->MAR4) = 0xffffffff;
 }
 
-void rtl8139_nicinit() {
-  // Search in PCI configuration space
-  int i = 0;
-  for(i = 0; i < 32; i++) {
-    if(read_pci_config_register(0, i, 0, 0) == 0x813910ec)
-      break;
-  }
-
-  // enable PCI bus mastering
-  write_pci_config_register(0, i, 0, 0x4, read_pci_config_register(0, i, 0, 0x4) | 0x7);
-
-  // Set base address for memory mapped io
-  regs = (struct RTL8139_registers*) read_pci_config_register(0, i, 0, 0x14);
-  
-  // Set the LWAKE + LWPTN to active high. This should essentially 'power on' the device. 
-  regs->Config1 = 0x0;
-
+void rtl8139_reset(){
   // Software reset
   regs->Cmd = CmdReset;
+  cur_tx = 0;
 
   // Check that the chip has finished the reset
   for (int j = 1000; j > 0; j--) {
@@ -173,6 +165,93 @@ void rtl8139_nicinit() {
   // Enable all known interrupts by setting the interrupt mask
   regs->IMR = PCIErr | PCSTimeout | RxUnderrun | RxOverflow | RxFIFOOver | TxErr | TxOK | RxErr | RxOK;
 }
+
+void rtl8139_nicinit() {
+  // Search in PCI configuration space
+  int i = 0;
+  for(i = 0; i < 32; i++) {
+    if(read_pci_config_register(0, i, 0, 0) == 0x813910ec)
+      break;
+  }
+
+  // enable PCI bus mastering
+  write_pci_config_register(0, i, 0, 0x4, read_pci_config_register(0, i, 0, 0x4) | 0x7);
+
+  // Set base address for memory mapped io
+  regs = (struct RTL8139_registers*) read_pci_config_register(0, i, 0, 0x14);
+  
+  // Set the LWAKE + LWPTN to active high. This should essentially 'power on' the device. 
+  regs->Config1 = 0x0;
+  
+  //call reset
+  rtl8139_reset();
+}
+
+void delay(int microseconds) {
+    uint start_ticks = ticks;
+    uint desired_ticks = (microseconds * 10) / 1000; // Convert microseconds to ticks (assuming 10ms timer interrupt)
+    while ((ticks - start_ticks) < desired_ticks) {
+        // Wait until desired number of ticks has passed
+    }
+}
+
+int rtl8139_send(void *packet, int length){
+  unsigned int len = length;
+  unsigned long txstatus;
+  unsigned int status;
+  int i = 0;
+
+  memmove(tx_buffer, packet, length);
+
+  cprintf("sending %d bytes\n", len);
+
+  /*
+  * Note: RTL8139 doesn't auto-pad, send minimum payload (another 4
+  * bytes are sent automatically for the FCS, totalling to 64 bytes).
+  */
+  while (len < ETH_ZLEN){
+    tx_buffer[len++] = '\0';
+  }
+
+  //flush_cache((unsigned long)tx_buffer, length);-need to check how to implement
+  
+  outl((unsigned long)tx_buffer,regs->TxAddr0 + cur_tx * 4);
+  // tx_buffer needs to be copied from physical memeory to PIC buffer - Not sure how to impliment that function 
+  
+  outl(((TX_FIFO_THRESH << 11) & 0x003f0000) | len,regs->TxStatus0 + cur_tx * 4);
+
+  do {
+	status = inl(regs->ISR);
+	/*
+	* Only acknlowledge interrupt sources we can properly
+	* handle here - the RTL_REG_INTRSTATUS_RXOVERFLOW/
+	* RTL_REG_INTRSTATUS_RXFIFOOVER MUST be handled in the
+	* rtl8139_recv() function.
+	*/
+	status &= TxOK | TxErr | PCIErr;
+	outl(status, regs->ISR);
+	if (status)
+		break;
+
+	delay(10);
+	} while (i++ < RTL_TIMEOUT);
+
+   txstatus = inl(regs->TxStatus0 + cur_tx * 4);
+
+   if (!(status & TxOK)) {
+     cprintf("tx timeout/error (%d usecs), status %hX txstatus %lX\n",10 * i, status, txstatus);
+
+     rtl8139_reset();
+     return 0;
+   }
+
+   cur_tx = (cur_tx + 1) % NUM_TX_DESC;
+
+   cprintf("tx done, status %hX txstatus %lX\n",status, txstatus);
+
+   return length ? 0 : -ETIMEDOUT;
+}
+
 
 /*
 void nicinit() {
