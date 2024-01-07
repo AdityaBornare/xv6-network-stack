@@ -188,11 +188,11 @@ void rtl8139_nicinit() {
 }
 
 void delay(int microseconds) {
-    uint start_ticks = ticks;
-    uint desired_ticks = (microseconds * 10) / 1000; // Convert microseconds to ticks (assuming 10ms timer interrupt)
-    while ((ticks - start_ticks) < desired_ticks) {
-        // Wait until desired number of ticks has passed
-    }
+  uint start_ticks = ticks;
+  uint desired_ticks = (microseconds * 10) / 1000; // Convert microseconds to ticks (assuming 10ms timer interrupt)
+  while ((ticks - start_ticks) < desired_ticks) {
+    // Wait until desired number of ticks has passed
+  }
 }
 
 int rtl8139_send(void *packet, int length){
@@ -221,35 +221,35 @@ int rtl8139_send(void *packet, int length){
   outl(((TX_FIFO_THRESH << 11) & 0x003f0000) | len,regs->TxStatus0 + cur_tx * 4);
 
   do {
-	status = inl(regs->ISR);
-	/*
-	* Only acknlowledge interrupt sources we can properly
-	* handle here - the RTL_REG_INTRSTATUS_RXOVERFLOW/
-	* RTL_REG_INTRSTATUS_RXFIFOOVER MUST be handled in the
-	* rtl8139_recv() function.
-	*/
-	status &= TxOK | TxErr | PCIErr;
-	outl(status, regs->ISR);
-	if (status)
-		break;
+    status = inl(regs->ISR);
+    /*
+    * Only acknlowledge interrupt sources we can properly
+    * handle here - the RTL_REG_INTRSTATUS_RXOVERFLOW/
+    * RTL_REG_INTRSTATUS_RXFIFOOVER MUST be handled in the
+    * rtl8139_recv() function.
+    */
+    status &= TxOK | TxErr | PCIErr;
+    outl(status, regs->ISR);
+    if (status)
+      break;
 
-	delay(10);
-	} while (i++ < RTL_TIMEOUT);
+    delay(10);
+    } while (i++ < RTL_TIMEOUT);
 
-   txstatus = inl(regs->TxStatus0 + cur_tx * 4);
+  txstatus = inl(regs->TxStatus0 + cur_tx * 4);
 
-   if (!(status & TxOK)) {
-     cprintf("tx timeout/error (%d usecs), status %hX txstatus %lX\n",10 * i, status, txstatus);
+  if (!(status & TxOK)) {
+    cprintf("tx timeout/error (%d usecs), status %hX txstatus %lX\n",10 * i, status, txstatus);
 
-     rtl8139_reset();
-     return 0;
-   }
+    rtl8139_reset();
+    return 0;
+  }
 
-   cur_tx = (cur_tx + 1) % NUM_TX_DESC;
+  cur_tx = (cur_tx + 1) % NUM_TX_DESC;
 
-   cprintf("tx done, status %hX txstatus %lX\n",status, txstatus);
+  cprintf("tx done, status %hX txstatus %lX\n",status, txstatus);
 
-   return length ? 0 : -ETIMEDOUT;
+  return length ? 0 : -ETIMEDOUT;
 }
 
 
