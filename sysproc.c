@@ -91,7 +91,7 @@ sys_uptime(void)
 }
 
 int
-sys_test(void) 
+sys_test(void)
 {
   cprintf("Inside the kernel\n");
   rtl8139_nicinit();
@@ -100,4 +100,3 @@ sys_test(void)
   cprintf("%d\n", res);
   return 0;
 }
-

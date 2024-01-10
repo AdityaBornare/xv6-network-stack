@@ -13,7 +13,7 @@
 #define ETH_ZLEN	60	             // Min. octets in frame sans FCS 
 #define RX_BUF_LEN_IDX 0           // 0, 1, 2 is allowed - 8k ,16k ,32K rx buffer
 #define RTL_TIMEOUT 100000
-#define ETIMEDOUT 110  		         //connection timed out
+#define ETIMEDOUT -1  		         //connection timed out
 
 #define RX_BUF_LEN (8192 << RX_BUF_LEN_IDX)
 
@@ -37,7 +37,7 @@ struct RTL8139_registers {
   uchar IDR5;                   // 0x05
   ushort reservedi0;            // 0x06 - 0x07
   uchar MAR0;                   // 0x08
-  uchar MAR1;                   // 0x09
+  uchar MAR2;                   // 0x09
   uchar MAR2;                   // 0x0A
   uchar MAR3;                   // 0x0B
   uchar MAR4;                   // 0x0C
@@ -88,7 +88,7 @@ enum IntrStatusBits {
   TxErr      = 0x0008,
   RxOverflow = 0x0010,
   RxUnderrun = 0x0020,
-  RxFIFOOver = 0x0040,
+  RxFIFOover = 0x0040,
   PCSTimeout = 0x4000,
   PCIErr     = 0x8000,
 };
@@ -144,14 +144,14 @@ void rtl8139_reset(){
 
   // Change operating mode before writing to config registers
   regs->Cfg9346 =  0xC0;
-  
+
   // Set the RE and TE bits in command register before setting transfer thresholds
   regs->Cmd = CmdTxEnb | CmdRxEnb;
-  
+
   // Set transfer thresholds (accept no frames yet!)
   regs->RxConfig = rx_config;
   regs->TxConfig = (TX_DMA_BURST << 8) | 0x03000000;
-  
+
   // Change operating mode back to the normal network communication mode
   regs->Cfg9346 = 0x00;
 
@@ -163,8 +163,9 @@ void rtl8139_reset(){
   rtl8139_set_rx_mode();
   regs->Cmd = CmdTxEnb | CmdRxEnb;
 
+  regs->ISR = 0;
   // Enable all known interrupts by setting the interrupt mask
-  regs->IMR = PCIErr | PCSTimeout | RxUnderrun | RxOverflow | RxFIFOOver | TxErr | TxOK | RxErr | RxOK;
+  regs->IMR = PCIErr | PCSTimeout | RxUnderrun | RxOverflow | RxFIFOover | TxErr | TxOK | RxErr | RxOK;
 }
 
 void rtl8139_nicinit() {
@@ -180,10 +181,10 @@ void rtl8139_nicinit() {
 
   // Set base address for memory mapped io
   regs = (struct RTL8139_registers*) read_pci_config_register(0, i, 0, 0x14);
-  
-  // Set the LWAKE + LWPTN to active high. This should essentially 'power on' the device. 
+
+  // Set the LWAKE + LWPTN to active high. This should essentially 'power on' the device.
   regs->Config1 = 0x0;
-  
+
   //call reset
   rtl8139_reset();
 }
@@ -192,51 +193,36 @@ void delay(int microseconds) {
   uint start_ticks = ticks;
 
   // Convert microseconds to ticks (assuming 10ms timer interrupt)
-  uint desired_ticks = (microseconds * 10) / 1000;  
-  
+  uint desired_ticks = (microseconds * 10) / 1000;
+
   while ((ticks - start_ticks) < desired_ticks) {
     // Wait until desired number of ticks has passed
   }
 }
 
+// packet transmission: returns 0 on success, -1 on error/timeout
 int rtl8139_send(void *packet, int length){
+  if (length == 0)
+    return -1;
+
   uint len = length;
-  uint txstatus;
-  uint status;
+  volatile uint txstatus;
+  volatile uint status;
   int i = 0;
 
   memmove(tx_buffer, packet, length);
 
   cprintf("sending %d bytes\n", len);
 
-  /*
-  * Note: RTL8139 doesn't auto-pad, send minimum payload (another 4
-  * bytes are sent automatically for the FCS, totalling to 64 bytes).
-  */
+  //Note: RTL8139 doesn't auto-pad, send minimum payload.
   while (len < ETH_ZLEN){
     tx_buffer[len++] = '\0';
   }
 
-  //flush_cache((unsigned long)tx_buffer, length);-need to check how to implement 
   *(&regs->TxAddr0 + cur_tx) = V2P((uint)tx_buffer);
-
-  // outl((unsigned long)tx_buffer,regs->TxAddr0 + cur_tx * 4);
- 
-  // tx_buffer needs to be copied from physical memeory to PIC buffer - Not sure how to impliment that function 
-  
-  regs->ISR = 0;
-  txstatus = *(&regs->TxStatus0 + cur_tx);
-  cprintf("txstatus before send %x\n", txstatus);
-  
-  txstatus = (TX_FIFO_THRESH << 11 | length) & 0xffffdfff;
-  cprintf("%x\n", txstatus);
+  txstatus = (TX_FIFO_THRESH << 11 | len) & 0xffffdfff;
   *(&regs->TxStatus0 + cur_tx) = txstatus;
 
-
-  txstatus = *(&regs->TxStatus0 + cur_tx);
-  cprintf("txstatus just after send %x\n", txstatus);
-  // outl(((TX_FIFO_THRESH << 11) & 0x003f0000) | len,regs->TxStatus0 + cur_tx * 4);
-  
   do {
     status = regs->ISR;
     /*
@@ -245,29 +231,26 @@ int rtl8139_send(void *packet, int length){
     * RTL_REG_INTRSTATUS_RXFIFOOVER MUST be handled in the
     * rtl8139_recv() function.
     */
-    
+
     status &= TxOK | TxErr | PCIErr;
     cprintf("status after send %x\n", status);
-    // regs->ISR = status;
+
     if (status)
       break;
 
     delay(10);
-    } while (i++ < RTL_TIMEOUT);
+  } while (i++ < RTL_TIMEOUT);
 
   txstatus = *(&regs->TxStatus0 + cur_tx);
-  //txstatus = inl(regs->TxStatus0 + cur_tx * 4);
-  
+
   if (!(status & TxOK)) {
     cprintf("tx timeout/error (%d usecs), status %x txstatus %x\n",10 * i, status, txstatus);
 
-    // rtl8139_reset();
-    return 0;
+    rtl8139_reset();
+    return -1;
   }
-  
+
   cur_tx = (cur_tx + 1) % NUM_TX_DESC;
-
   cprintf("tx done, status %x txstatus %x\n",status, txstatus);
-
-  return length ? 0 : -ETIMEDOUT;
+  return 0;
 }
