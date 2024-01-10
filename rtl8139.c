@@ -37,7 +37,7 @@ struct RTL8139_registers {
   uchar IDR5;                   // 0x05
   ushort reservedi0;            // 0x06 - 0x07
   uchar MAR0;                   // 0x08
-  uchar MAR2;                   // 0x09
+  uchar MAR1;                   // 0x09
   uchar MAR2;                   // 0x0A
   uchar MAR3;                   // 0x0B
   uchar MAR4;                   // 0x0C
