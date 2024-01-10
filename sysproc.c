@@ -95,6 +95,9 @@ sys_test(void)
 {
   cprintf("Inside the kernel\n");
   rtl8139_nicinit();
+  char s[8] = "madtuchu";
+  int res = rtl8139_send((void*)s, 8);
+  cprintf("%d\n", res);
   return 0;
 }
 

@@ -123,6 +123,8 @@ void            yield(void);
 
 // rtl8139.c
 void rtl8139_nicinit();
+int rtl8139_send(void *packet, int length);
+
 
 // swtch.S
 void            swtch(struct context**, struct context*);

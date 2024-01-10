@@ -1,18 +1,19 @@
 #include "types.h"
 #include "defs.h"
 #include "x86.h"
+#include "memlayout.h"
 
-#define TX_FIFO_THRESH 256	      // In bytes, rounded down to 32 byte units
-#define RX_FIFO_THRESH 4          // Rx buffer level before first PCI xfer
-#define RX_DMA_BURST 4            // Calculate as 16 << 4 = 256 bytes
-#define TX_DMA_BURST 4            // Calculate as 16 << 4 = 256 bytes
-#define NUM_TX_DESC	4             // Number of Tx descriptor registers
-#define ETH_FRAME_LEN	1514	/* Max. octets in frame sans FCS */
+#define TX_FIFO_THRESH 256	       // In bytes, rounded down to 32 byte units
+#define RX_FIFO_THRESH 4           // Rx buffer level before first PCI xfer
+#define RX_DMA_BURST 4             // Calculate as 16 << 4 = 256 bytes
+#define TX_DMA_BURST 4             // Calculate as 16 << 4 = 256 bytes
+#define NUM_TX_DESC	4              // Number of Tx descriptor registers
+#define ETH_FRAME_LEN	1514	       // Max. octets in frame sans FCS
 #define TX_BUF_SIZE	ETH_FRAME_LEN
-#define ETH_ZLEN	60	/* Min. octets in frame sans FCS */
-#define RX_BUF_LEN_IDX 0          // 0, 1, 2 is allowed - 8k ,16k ,32K rx buffer
+#define ETH_ZLEN	60	             // Min. octets in frame sans FCS 
+#define RX_BUF_LEN_IDX 0           // 0, 1, 2 is allowed - 8k ,16k ,32K rx buffer
 #define RTL_TIMEOUT 100000
-#define ETIMEDOUT 110  		  //connection timed out
+#define ETIMEDOUT 110  		         //connection timed out
 
 #define RX_BUF_LEN (8192 << RX_BUF_LEN_IDX)
 
@@ -189,16 +190,19 @@ void rtl8139_nicinit() {
 
 void delay(int microseconds) {
   uint start_ticks = ticks;
-  uint desired_ticks = (microseconds * 10) / 1000; // Convert microseconds to ticks (assuming 10ms timer interrupt)
+
+  // Convert microseconds to ticks (assuming 10ms timer interrupt)
+  uint desired_ticks = (microseconds * 10) / 1000;  
+  
   while ((ticks - start_ticks) < desired_ticks) {
     // Wait until desired number of ticks has passed
   }
 }
 
 int rtl8139_send(void *packet, int length){
-  unsigned int len = length;
-  unsigned long txstatus;
-  unsigned int status;
+  uint len = length;
+  uint txstatus;
+  uint status;
   int i = 0;
 
   memmove(tx_buffer, packet, length);
@@ -213,80 +217,57 @@ int rtl8139_send(void *packet, int length){
     tx_buffer[len++] = '\0';
   }
 
-  //flush_cache((unsigned long)tx_buffer, length);-need to check how to implement
-  
-  outl((unsigned long)tx_buffer,regs->TxAddr0 + cur_tx * 4);
+  //flush_cache((unsigned long)tx_buffer, length);-need to check how to implement 
+  *(&regs->TxAddr0 + cur_tx) = V2P((uint)tx_buffer);
+
+  // outl((unsigned long)tx_buffer,regs->TxAddr0 + cur_tx * 4);
+ 
   // tx_buffer needs to be copied from physical memeory to PIC buffer - Not sure how to impliment that function 
   
-  outl(((TX_FIFO_THRESH << 11) & 0x003f0000) | len,regs->TxStatus0 + cur_tx * 4);
+  regs->ISR = 0;
+  txstatus = *(&regs->TxStatus0 + cur_tx);
+  cprintf("txstatus before send %x\n", txstatus);
+  
+  txstatus = (TX_FIFO_THRESH << 11 | length) & 0xffffdfff;
+  cprintf("%x\n", txstatus);
+  *(&regs->TxStatus0 + cur_tx) = txstatus;
 
+
+  txstatus = *(&regs->TxStatus0 + cur_tx);
+  cprintf("txstatus just after send %x\n", txstatus);
+  // outl(((TX_FIFO_THRESH << 11) & 0x003f0000) | len,regs->TxStatus0 + cur_tx * 4);
+  
   do {
-    status = inl(regs->ISR);
+    status = regs->ISR;
     /*
     * Only acknlowledge interrupt sources we can properly
     * handle here - the RTL_REG_INTRSTATUS_RXOVERFLOW/
     * RTL_REG_INTRSTATUS_RXFIFOOVER MUST be handled in the
     * rtl8139_recv() function.
     */
+    
     status &= TxOK | TxErr | PCIErr;
-    outl(status, regs->ISR);
+    cprintf("status after send %x\n", status);
+    // regs->ISR = status;
     if (status)
       break;
 
     delay(10);
     } while (i++ < RTL_TIMEOUT);
 
-  txstatus = inl(regs->TxStatus0 + cur_tx * 4);
-
+  txstatus = *(&regs->TxStatus0 + cur_tx);
+  //txstatus = inl(regs->TxStatus0 + cur_tx * 4);
+  
   if (!(status & TxOK)) {
-    cprintf("tx timeout/error (%d usecs), status %hX txstatus %lX\n",10 * i, status, txstatus);
+    cprintf("tx timeout/error (%d usecs), status %x txstatus %x\n",10 * i, status, txstatus);
 
-    rtl8139_reset();
+    // rtl8139_reset();
     return 0;
   }
-
+  
   cur_tx = (cur_tx + 1) % NUM_TX_DESC;
 
-  cprintf("tx done, status %hX txstatus %lX\n",status, txstatus);
+  cprintf("tx done, status %x txstatus %x\n",status, txstatus);
 
   return length ? 0 : -ETIMEDOUT;
 }
-
-
-/*
-void nicinit() {
-  int i;
-  for(i = 0; i < 32; i++) {
-    if(read_pci_config_register(0, i, 0, 0) == 0x813910ec)
-      break;
-  }
-  
-  // Set base io address
-  ioaddr = read_pci_config_register(0, i, 0, 0x10) & 0x3;
-
-  // enable PCI bus mastering
-  write_pci_config_register(0, i, 0, 0x4, read_pci_config_register(0, i, 0, 0x4) | 0x7);
-
-  outb( ioaddr + 0x52, 0x0);
-
-  // software reset
-  outb(ioaddr + 0x37, 0x10);
-  
-  // Check that the chip has finished the reset
-  for (i = 1000; i > 0; i--) {
-    if ((inb(ioaddr + 0x37) & 0x10) == 0) break;
-  }
-  cprintf("%d\n", i);
-  cprintf("%x\n", ioaddr);
- 
- // outl(ioaddr + 0x30, (uint)rx_ring);
-  outw(ioaddr + 0x3c, 0x0005);
- 
-  // (1 << 7) is the WRAP bit, 0xf is AB+AM+APM+AAP
-  outl(ioaddr + 0x44, 0xf | (1 << 7)); 
- 
-  // Sets the RE and TE bits in command register  
-  outb(ioaddr + 0x37, 0x0C);
-  cprintf("%x\n", inb(ioaddr + 0x58));
-}
-*/
