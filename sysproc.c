@@ -6,6 +6,7 @@
 #include "memlayout.h"
 #include "mmu.h"
 #include "proc.h"
+#include "ether.h"
 
 int
 sys_fork(void)
@@ -95,8 +96,27 @@ sys_test(void)
 {
   cprintf("Inside the kernel\n");
   rtl8139_nicinit();
-  char s[8] = "madtuchu";
-  int res = rtl8139_send((void*)s, 8);
+  ether_pack packet;
+
+  // Set destination MAC address
+  // Example: b0:dc:ef:bf:be:4f
+  unsigned char destMAC[] = {0xb0, 0xdc, 0xef, 0xbf, 0xbe, 0x4f};
+  memmove(packet.dst, destMAC, sizeof(destMAC));
+
+  // Set source MAC address
+  // 52:54:98:76:54:32
+  unsigned char srcMAC[] = {0x52, 0x54, 0x98, 0x76, 0x54, 0x32};
+  memmove(packet.src, srcMAC, sizeof(srcMAC));
+
+  // Set EtherType (e.g., 0x0800 for IPv4)
+  packet.ethertype = 0x0800;
+
+  // Set data payload
+  char payload[] = "Hello, this is a test packet!";
+  memmove(packet.data, payload, sizeof(payload));
+
+  // Send the Ethernet packet using rtl8139_send
+  int res = rtl8139_send((void*)&packet, sizeof(packet));
   cprintf("%d\n", res);
   return 0;
 }
