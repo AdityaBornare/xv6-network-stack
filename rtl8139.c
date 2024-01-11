@@ -8,11 +8,14 @@
 #define TX_DMA_BURST 4            // Calculate as 16 << 4 = 256 bytes
 #define NUM_TX_DESC	4             // Number of Tx descriptor registers
 #define RX_BUF_LEN_IDX 0          // 0, 1, 2 is allowed - 8k ,16k ,32K rx buffer
+#define ETH_FRAME_LEN	1514	/* Max. octets in frame sans FCS */
+#define TX_BUF_SIZE	ETH_FRAME_LEN
 
 #define RX_BUF_LEN (8192 << RX_BUF_LEN_IDX)
 
 #define RX_MAX_PKT_LENGTH 1024    // Correct this later
 #define RX_MIN_PKT_LENGTH 0       // Correct this later
+#define RX_READ_POINTER_MASK 0    // Correct this later
 
 #define RTL_REG_RXCONFIG_ACCEPTBROADCAST 0x08
 #define RTL_REG_RXCONFIG_ACCEPTMULTICAST 0x04
@@ -26,6 +29,7 @@ const uint rx_config = (RX_BUF_LEN_IDX << 11) | (RX_FIFO_THRESH << 13) | (RX_DMA
 static uchar cur_rx;
 static uchar packets_received_good;
 static uchar byte_received;
+
 
 struct RTL8139_registers {
   uchar IDR0;                   // 0x00
@@ -104,7 +108,17 @@ enum PacketHeader {
 	MAR        = 0x0800,
 };
 
+struct RxStats{
+  uchar rx_errors;
+  uchar rx_frame_errors;
+  uchar rx_length_errors;
+  uchar rx_crc_errors;
+  uchar rx_dropped;
+};
+
+
 struct RTL8139_registers *regs;
+struct RxStats RxStats;
 
 uint read_pci_config_register(uchar bus, uchar device, uchar function, uchar offset) {
   uint address = (1 << 31) |   // Enable bit
@@ -115,7 +129,7 @@ uint read_pci_config_register(uchar bus, uchar device, uchar function, uchar off
 
   // Write address to address port
   outl(0xcf8, address);
-
+  
   // Read data from data port
   return inl(0xcfc);
 }
@@ -214,7 +228,7 @@ int rtl8139_packetOK() {
 		}
 
 	  packets_received_good++;
-	  byte_received = pkt_size;
+	  byte_received += pkt_size;
 	  
 		return 1;
 	}
@@ -224,8 +238,8 @@ int rtl8139_packetOK() {
 
 }
 
-/*
-int rtl8139_rx_interrupt_handler() {
+
+int rtl8139_receive() {
   
   uchar tmpCmd;
 	uint pkt_length;
@@ -241,7 +255,7 @@ int rtl8139_rx_interrupt_handler() {
 	  
 		tmpCmd = regs->Cmd;
 
-		if(tmpCmd & ) 
+		if(tmpCmd & RxBufEmpty) 
 			break;
 
 	}
@@ -250,12 +264,36 @@ int rtl8139_rx_interrupt_handler() {
 		p_income_pkt = rx_read_ptr + 4;
 		
 		if(rtl8139_packetOK()){
-		  	
-		}
-	}while(!tmpCmd);
-} //Incomplete
 
-*/
+		  	if ( (rx_read_ptr_offset + pkt_length) > RX_BUF_LEN ){
+
+           //wrap around to end of RxBuffer
+           memmove( rx_ring + RX_BUF_LEN , rx_ring,
+           (rx_read_ptr_offset + pkt_length - RX_BUF_LEN));
+        }
+        
+        //copy the packet out here
+        memmove(p_income_pkt, p_income_pkt, pkt_length - 4);//don't copy 4 bytes CRC
+
+        //update Read Pointer
+        rx_read_ptr_offset = (rx_read_ptr_offset + pkt_length + 4 + 3) & RX_READ_POINTER_MASK;
+        //4:for header length(PktLength include 4 bytes CRC)
+        //3:for dword alignment
+
+        regs->CurAddrPacket &= rx_read_ptr_offset - 0x10;
+
+    }
+    else{
+      rtl8139_set_rx_mode();
+      break;
+    }
+    
+    tmpCmd = regs->Cmd;
+    
+    }while (!(tmpCmd & RxBufEmpty));
+        
+    return 1;
+}
 
 /*
 void nicinit() {
