@@ -12,9 +12,9 @@ inb(ushort port)
 static inline uint
 inl(ushort port)
 {
-    uint data;
-    asm volatile("inl %1, %0" : "=a"(data) : "d"(port));
-    return data;
+  uint data;
+  asm volatile("inl %1, %0" : "=a"(data) : "d"(port));
+  return data;
 }
 
 static inline void
@@ -38,10 +38,10 @@ outw(ushort port, ushort data)
   asm volatile("out %0,%1" : : "a" (data), "d" (port));
 }
 
-static inline void 
+static inline void
 outl(ushort port, uint data)
 {
-    asm volatile("outl %0, %1" : : "a"(data), "d"(port));
+  asm volatile("outl %0, %1" : : "a"(data), "d"(port));
 }
 
 static inline void
