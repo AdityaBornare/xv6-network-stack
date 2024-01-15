@@ -36,7 +36,7 @@ struct RTL8139_registers {
   uchar IDR3;                   // 0x03
   uchar IDR4;                   // 0x04
   uchar IDR5;                   // 0x05
-  ushort reservedi0;            // 0x06 - 0x07
+  ushort reserved0;            // 0x06 - 0x07
   uchar MAR0;                   // 0x08
   uchar MAR1;                   // 0x09
   uchar MAR2;                   // 0x0A
@@ -73,6 +73,13 @@ struct RTL8139_registers {
   uchar MediaStatus;            // 0x58
   uchar config3;                // 0x59
   uchar Config4;                // 0x5A
+  uchar reserved2;              // 0x5B
+  ushort MulIntrSelect;         // 0x5c - 0x5D
+  uchar PciRevId;               // 0x5E
+  uchar reserved3;              // 0x5F
+  ushort TxStatusAllDesc;       // 0x60 - 0x61
+  ushort BasicModeCtrl;         // 0x62 - 0x62
+  ushort BasicModeStatus;       // 0x64 - 0x65
 };
 
 enum CmdBits {
@@ -121,9 +128,12 @@ void rtl8139_reset(){
   // Set the RE and TE bits in command register before setting transfer thresholds
   regs->Cmd = CmdTxEnb | CmdRxEnb;
 
-  // Set transfer thresholds (accept no frames yet!)
+  // Set transfer thresholds
   regs->RxConfig = rx_config;
   regs->TxConfig = (TX_DMA_BURST << 8) | 0x03000000;
+  
+  // Set full duplex mode
+  regs->BasicModeCtrl |= 0x0100;
 
   // Change operating mode back to the normal network communication mode
   regs->Cfg9346 = 0x00;
@@ -136,7 +146,7 @@ void rtl8139_reset(){
   rtl8139_set_rx_mode();
   regs->Cmd = CmdTxEnb | CmdRxEnb;
 
-  regs->ISR = 0;
+  regs->ISR = 0xff;
   // Enable interrupts by setting the interrupt mask
   regs->IMR = TxOK | RxOK | TxErr;
 }
@@ -164,6 +174,8 @@ void nicinit() {
   
   //call reset
   rtl8139_reset();
+
+  cprintf("BMSR = %x\n", regs->BasicModeStatus);
 }
 
 void delay(int microseconds) {
