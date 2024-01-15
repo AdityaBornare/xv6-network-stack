@@ -59,7 +59,7 @@ void            ideintr(void);
 void            iderw(struct buf*);
 
 // ioapic.c
-void            ioapicenable(int irq, int cpu);
+void            ioapicenable(int irq, int cpunum);
 extern uchar    ioapicid;
 void            ioapicinit(void);
 
@@ -90,6 +90,10 @@ void            end_op();
 // mp.c
 extern int      ismp;
 void            mpinit(void);
+
+// pci.c
+uint read_pci_config_register(uchar bus, uchar device, uchar function, uchar offset);
+void write_pci_config_register(uchar bus, uchar device, uchar function, uchar offset, uint data);
 
 // picirq.c
 void            picenable(int);
@@ -122,9 +126,9 @@ void            wakeup(void*);
 void            yield(void);
 
 // rtl8139.c
-void rtl8139_nicinit();
 int rtl8139_send(void *packet, int length);
-
+void nicinit();
+void nicintr();
 
 // swtch.S
 void            swtch(struct context**, struct context*);

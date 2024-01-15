@@ -94,7 +94,6 @@ sys_uptime(void)
 int
 sys_test(void)
 {
-  rtl8139_nicinit();
   ether_pack packet;
 
   // Set destination MAC address
@@ -115,8 +114,7 @@ sys_test(void)
   memmove(packet.data, payload, sizeof(payload));
 
   // Send the Ethernet packet using rtl8139_send
-  int res = rtl8139_send((void*)&packet, sizeof(packet));
+  rtl8139_send((void*)&packet, sizeof(packet));
 
-  cprintf("%d\n", res);
   return 0;
 }

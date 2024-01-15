@@ -2,6 +2,7 @@
 #include "defs.h"
 #include "x86.h"
 #include "memlayout.h"
+#include "traps.h"
 
 #define TX_FIFO_THRESH 256	       // In bytes, rounded down to 32 byte units
 #define RX_FIFO_THRESH 4           // Rx buffer level before first PCI xfer
@@ -93,35 +94,7 @@ enum IntrStatusBits {
   PCIErr     = 0x8000,
 };
 
-struct RTL8139_registers *regs;
-
-uint read_pci_config_register(uchar bus, uchar device, uchar function, uchar offset) {
-  uint address = (1 << 31) |   // Enable bit
-  ((uint)bus << 16) |          // Bus number
-  ((uint)device << 11) |       // Device number
-  ((uint)function << 8) |      // Function numbe
-  (offset & 0xfc);             // Register offset (rounded down to nearest multiple of 4)
-
-  // Write address to address port
-  outl(0xcf8, address);
-
-  // Read data from data port
-  return inl(0xcfc);
-}
-
-void write_pci_config_register(uchar bus, uchar device, uchar function, uchar offset, uint data) {
-  uint address = (1 << 31) |   // Enable bit
-  ((uint)bus << 16) |          // Bus number
-  ((uint)device << 11) |       // Device number
-  ((uint)function << 8) |      // Function numbe
-  (offset & 0xfc);             // Register offset (rounded down to nearest multiple of 4)
-
-  // Write address to address port
-  outl(0xcf8, address);
-
-  // write data to data port
-  outl(0xcfc, data);
-}
+volatile struct RTL8139_registers *regs;
 
 void rtl8139_set_rx_mode() {
   uint rx_mode = RTL_REG_RXCONFIG_ACCEPTBROADCAST | RTL_REG_RXCONFIG_ACCEPTMULTICAST | RTL_REG_RXCONFIG_ACCEPTMYPHYS;
@@ -164,11 +137,11 @@ void rtl8139_reset(){
   regs->Cmd = CmdTxEnb | CmdRxEnb;
 
   regs->ISR = 0;
-  // Enable all known interrupts by setting the interrupt mask
-  regs->IMR = PCIErr | PCSTimeout | RxUnderrun | RxOverflow | RxFIFOover | TxErr | TxOK | RxErr | RxOK;
+  // Enable interrupts by setting the interrupt mask
+  regs->IMR = TxOK | RxOK | TxErr;
 }
 
-void rtl8139_nicinit() {
+void nicinit() {
   // Search in PCI configuration space
   int i = 0;
   for(i = 0; i < 32; i++) {
@@ -178,13 +151,17 @@ void rtl8139_nicinit() {
 
   // enable PCI bus mastering
   write_pci_config_register(0, i, 0, 0x4, read_pci_config_register(0, i, 0, 0x4) | 0x7);
-
+  
   // Set base address for memory mapped io
-  regs = (struct RTL8139_registers*) read_pci_config_register(0, i, 0, 0x14);
+  regs = (volatile struct RTL8139_registers*) read_pci_config_register(0, i, 0, 0x14);
+
+  // Configure interrupt line
+  ioapicenable(9, 0);
+  ioapicenable(11, 0);
 
   // Set the LWAKE + LWPTN to active high. This should essentially 'power on' the device.
   regs->Config1 = 0x0;
-
+  
   //call reset
   rtl8139_reset();
 }
@@ -207,50 +184,52 @@ int rtl8139_send(void *packet, int length){
 
   uint len = length;
   volatile uint txstatus;
-  volatile uint status;
-  int i = 0;
 
   memmove(tx_buffer, packet, length);
-
-  cprintf("sending %d bytes\n", len);
 
   //Note: RTL8139 doesn't auto-pad, send minimum payload.
   while (len < ETH_ZLEN){
     tx_buffer[len++] = '\0';
   }
 
+  cprintf("sending %d bytes\n", len);
+
   *(&regs->TxAddr0 + cur_tx) = V2P((uint)tx_buffer);
   txstatus = (TX_FIFO_THRESH << 11 | len) & 0xffffdfff;
   *(&regs->TxStatus0 + cur_tx) = txstatus;
 
-  do {
-    status = regs->ISR;
-    /*
-    * Only acknlowledge interrupt sources we can properly
-    * handle here - the RTL_REG_INTRSTATUS_RXOVERFLOW/
-    * RTL_REG_INTRSTATUS_RXFIFOOVER MUST be handled in the
-    * rtl8139_recv() function.
-    */
-
-    status &= TxOK | TxErr | PCIErr;
-    cprintf("status after send %x\n", status);
-
-    if (status)
-      break;
-
-    delay(10);
-  } while (i++ < RTL_TIMEOUT);
-
   txstatus = *(&regs->TxStatus0 + cur_tx);
-
+  /*
   if (!(status & TxOK)) {
     cprintf("tx timeout/error (%d usecs), status %x txstatus %x\n",10 * i, status, txstatus);
 
     rtl8139_reset();
     return -1;
   }
+  */
 
-  cur_tx = (cur_tx + 1) % NUM_TX_DESC;
-  cprintf("tx done, status %x txstatus %x\n",status, txstatus);
+  // if (status & TxOK)
+		// cur_tx = (cur_tx + 1) % NUM_TX_DESC;
+  // cur_tx = (cur_tx + 1) % NUM_TX_DESC;
+  // cprintf("tx done, status %x txstatus %x\n",status, txstatus);
   return 0;
+}
+
+void nicintr() {
+  if (regs->ISR & TxOK) {
+    cprintf("ISR before %x\n", regs->ISR);
+    volatile uint status = regs->ISR;
+    status &= TxOK;
+    regs->ISR = status;
+    cprintf("ISR after %x\n", regs->ISR);
+    cur_tx = (cur_tx + 1) % NUM_TX_DESC;
+  }
+  
+  else if (regs->ISR & TxErr) {
+    cprintf("Transmission Error\n");
+    rtl8139_reset();
+    volatile uint status = regs->ISR;
+    status &= TxErr;
+    regs->ISR = status;
+  }
 }
