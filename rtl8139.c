@@ -17,6 +17,9 @@
 #define ETIMEDOUT -1  		         //connection timed out
 
 #define RX_BUF_LEN (8192 << RX_BUF_LEN_IDX)
+#define RX_MAX_PKT_LENGTH 1024    // Correct this later
+#define RX_MIN_PKT_LENGTH 0       // Correct this later
+#define RX_READ_POINTER_MASK 0    // Correct this later
 
 #define RTL_REG_RXCONFIG_ACCEPTBROADCAST 0x08
 #define RTL_REG_RXCONFIG_ACCEPTMULTICAST 0x04
@@ -28,6 +31,11 @@ static unsigned char rx_ring[RX_BUF_LEN + 16] __attribute__((__aligned__(4)));
 unsigned int cur_tx;
 
 const uint rx_config = (RX_BUF_LEN_IDX << 11) | (RX_FIFO_THRESH << 13) | (RX_DMA_BURST << 8);
+
+static uchar cur_rx;
+static uchar packets_received_good;
+static uchar byte_received;
+
 
 struct RTL8139_registers {
   uchar IDR0;                   // 0x00
@@ -101,7 +109,28 @@ enum IntrStatusBits {
   PCIErr     = 0x8000,
 };
 
+enum PacketHeader {
+	ROK       = 0x0001,
+	FAErr     = 0x0002,
+	CRC        = 0x0004,
+	LongPkt    = 0x0008,
+	RUNT       = 0x0010,
+	ISE        = 0x0020,
+	BAR        = 0x0200,
+	PAM        = 0x0400,
+	MAR        = 0x0800,
+};
+
+struct RxStats{
+  uchar rx_errors;
+  uchar rx_frame_errors;
+  uchar rx_length_errors;
+  uchar rx_crc_errors;
+  uchar rx_dropped;
+};
+
 volatile struct RTL8139_registers *regs;
+struct RxStats RxStats;
 
 void rtl8139_set_rx_mode() {
   uint rx_mode = RTL_REG_RXCONFIG_ACCEPTBROADCAST | RTL_REG_RXCONFIG_ACCEPTMULTICAST | RTL_REG_RXCONFIG_ACCEPTMYPHYS;
@@ -149,6 +178,94 @@ void rtl8139_reset(){
   regs->ISR = 0xff;
   // Enable interrupts by setting the interrupt mask
   regs->IMR = TxOK | RxOK | TxErr;
+
+	//cur_rx set to 0
+	cur_rx = 0;
+}
+
+int rtl8139_packetOK() {
+	
+	int bad_packet = (regs->ISR & RUNT) || (regs->ISR & LongPkt) || (regs->ISR & CRC) || (regs->ISR & FAErr);
+  
+  uint ring_offset = cur_rx % RX_BUF_LEN;	
+	uint rx_status =  *(uint* )(rx_ring + ring_offset);
+	uint rx_size = rx_status >> 16;     // Includes CRC
+
+	int pkt_size = rx_size - 4;
+
+	if(!bad_packet && (regs->ISR & ROK)) {
+     
+	  if(pkt_size > RX_MAX_PKT_LENGTH || rx_size < RX_MIN_PKT_LENGTH) {
+		  
+		  return 0;
+		}
+
+	  packets_received_good++;
+	  byte_received += pkt_size;
+	  
+		return 1;
+	}
+
+  else
+	  return 0;
+
+}
+
+
+int rtl8139_receive() {
+  
+  uchar tmpCmd;
+	uint pkt_length;
+	uchar *p_income_pkt, *rx_read_ptr;
+  uint rx_read_ptr_offset = cur_rx % RX_BUF_LEN;
+
+	unsigned long rx_status =  *(unsigned long* )(rx_ring + rx_read_ptr_offset);
+  uint rx_size = rx_status >> 16;     // Includes CRC
+
+  pkt_length = rx_size - 4;
+
+	while(1){
+	  
+		tmpCmd = regs->Cmd;
+
+		if(tmpCmd & RxBufEmpty) 
+			break;
+
+	}
+	do {
+	  rx_read_ptr = rx_ring + rx_read_ptr_offset;
+		p_income_pkt = rx_read_ptr + 4;
+		
+		if(rtl8139_packetOK()){
+
+		  	if ( (rx_read_ptr_offset + pkt_length) > RX_BUF_LEN ){
+
+           //wrap around to end of RxBuffer
+           memmove( rx_ring + RX_BUF_LEN , rx_ring,
+           (rx_read_ptr_offset + pkt_length - RX_BUF_LEN));
+        }
+        
+        //copy the packet out here
+        memmove(p_income_pkt, p_income_pkt, pkt_length - 4);//don't copy 4 bytes CRC
+
+        //update Read Pointer
+        rx_read_ptr_offset = (rx_read_ptr_offset + pkt_length + 4 + 3) & RX_READ_POINTER_MASK;
+        //4:for header length(PktLength include 4 bytes CRC)
+        //3:for dword alignment
+
+        regs->CurAddrPacket &= rx_read_ptr_offset - 0x10;
+
+    }
+    else{
+      rtl8139_set_rx_mode();
+      break;
+    }
+    
+    tmpCmd = regs->Cmd;
+    
+    }while (!(tmpCmd & RxBufEmpty));
+        
+    return 1;
 }
 
 void nicinit() {
