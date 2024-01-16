@@ -26,16 +26,7 @@
 #define RTL_REG_RXCONFIG_ACCEPTMYPHYS 0x02
 #define RTL_REG_RXCONFIG_ACCEPTALLPHYS 0x01
 
-static unsigned char tx_buffer[TX_BUF_SIZE] __attribute__((__aligned__(4)));
-static unsigned char rx_ring[RX_BUF_LEN + 16] __attribute__((__aligned__(4)));
-unsigned int cur_tx;
-
 const uint rx_config = (RX_BUF_LEN_IDX << 11) | (RX_FIFO_THRESH << 13) | (RX_DMA_BURST << 8);
-
-static uchar cur_rx;
-static uchar packets_received_good;
-static uchar byte_received;
-
 
 struct RTL8139_registers {
   uchar IDR0;                   // 0x00
@@ -90,6 +81,16 @@ struct RTL8139_registers {
   ushort BasicModeStatus;       // 0x64 - 0x65
 };
 
+static struct nic {
+  volatile struct RTL8139_registers *regs;
+  unsigned char tx_buffer[TX_BUF_SIZE] __attribute__((__aligned__(4)));
+  unsigned char rx_ring[RX_BUF_LEN + 16] __attribute__((__aligned__(4)));
+  unsigned int cur_tx;
+  uchar cur_rx;
+  uchar packets_received_good;
+  uchar byte_received;
+} nic;
+
 enum CmdBits {
   RxBufEmpty = 0x01,
   CmdTxEnb   = 0x04,
@@ -107,18 +108,19 @@ enum IntrStatusBits {
   RxFIFOover = 0x0040,
   PCSTimeout = 0x4000,
   PCIErr     = 0x8000,
+
 };
 
 enum PacketHeader {
-	ROK       = 0x0001,
-	FAErr     = 0x0002,
+	ROK        = 0x0001,
+	FAErr      = 0x0002,
 	CRC        = 0x0004,
 	LongPkt    = 0x0008,
 	RUNT       = 0x0010,
 	ISE        = 0x0020,
-	BAR        = 0x0200,
-	PAM        = 0x0400,
-	MAR        = 0x0800,
+	BAR        = 0x2000,
+	PAM        = 0x4000,
+	MAR        = 0x8000,
 };
 
 struct RxStats{
@@ -129,143 +131,57 @@ struct RxStats{
   uchar rx_dropped;
 };
 
-volatile struct RTL8139_registers *regs;
 struct RxStats RxStats;
 
 void rtl8139_set_rx_mode() {
   uint rx_mode = RTL_REG_RXCONFIG_ACCEPTBROADCAST | RTL_REG_RXCONFIG_ACCEPTMULTICAST | RTL_REG_RXCONFIG_ACCEPTMYPHYS;
-  regs->RxConfig = rx_config | rx_mode;
-  *((uint*)&regs->MAR0) = 0xffffffff;
-  *((uint*)&regs->MAR4) = 0xffffffff;
+  nic.regs->RxConfig = rx_config | rx_mode;
+  *((uint*)&nic.regs->MAR0) = 0xffffffff;
+  *((uint*)&nic.regs->MAR4) = 0xffffffff;
 }
 
 void rtl8139_reset(){
   // Software reset
-  regs->Cmd = CmdReset;
-  cur_tx = 0;
+  nic.regs->Cmd = CmdReset;
+  nic.cur_tx = 0;
 
   // Check that the chip has finished the reset
   for (int j = 1000; j > 0; j--) {
-    if ((regs->Cmd & 0x10) == 0){
+    if ((nic.regs->Cmd & 0x10) == 0){
       break;
     }
   }
 
   // Change operating mode before writing to config registers
-  regs->Cfg9346 =  0xC0;
+  nic.regs->Cfg9346 =  0xC0;
 
   // Set the RE and TE bits in command register before setting transfer thresholds
-  regs->Cmd = CmdTxEnb | CmdRxEnb;
+  nic.regs->Cmd = CmdTxEnb | CmdRxEnb;
 
   // Set transfer thresholds
-  regs->RxConfig = rx_config;
-  regs->TxConfig = (TX_DMA_BURST << 8) | 0x03000000;
+  nic.regs->RxConfig = rx_config;
+  nic.regs->TxConfig = (TX_DMA_BURST << 8) | 0x03000000;
   
   // Set full duplex mode
-  regs->BasicModeCtrl |= 0x0100;
+  nic.regs->BasicModeCtrl |= 0x0100;
 
   // Change operating mode back to the normal network communication mode
-  regs->Cfg9346 = 0x00;
+  nic.regs->Cfg9346 = 0x00;
 
   // Initialize rx buffer
-  regs->RxBufStart = (uint)rx_ring;
+  nic.regs->RxBufStart = (uint)nic.rx_ring;
 
   // Start the chip's Tx and Rx process
-  regs->MissedPacketCounter = 0;
+  nic.regs->MissedPacketCounter = 0;
   rtl8139_set_rx_mode();
-  regs->Cmd = CmdTxEnb | CmdRxEnb;
+  nic.regs->Cmd = CmdTxEnb | CmdRxEnb;
 
-  regs->ISR = 0xff;
+  nic.regs->ISR = 0xff;
   // Enable interrupts by setting the interrupt mask
-  regs->IMR = TxOK | RxOK | TxErr;
+  nic.regs->IMR = TxOK | RxOK | TxErr;
 
-	//cur_rx set to 0
-	cur_rx = 0;
-}
-
-int rtl8139_packetOK() {
-	
-	int bad_packet = (regs->ISR & RUNT) || (regs->ISR & LongPkt) || (regs->ISR & CRC) || (regs->ISR & FAErr);
-  
-  uint ring_offset = cur_rx % RX_BUF_LEN;	
-	uint rx_status =  *(uint* )(rx_ring + ring_offset);
-	uint rx_size = rx_status >> 16;     // Includes CRC
-
-	int pkt_size = rx_size - 4;
-
-	if(!bad_packet && (regs->ISR & ROK)) {
-     
-	  if(pkt_size > RX_MAX_PKT_LENGTH || rx_size < RX_MIN_PKT_LENGTH) {
-		  
-		  return 0;
-		}
-
-	  packets_received_good++;
-	  byte_received += pkt_size;
-	  
-		return 1;
-	}
-
-  else
-	  return 0;
-
-}
-
-
-int rtl8139_receive() {
-  
-  uchar tmpCmd;
-	uint pkt_length;
-	uchar *p_income_pkt, *rx_read_ptr;
-  uint rx_read_ptr_offset = cur_rx % RX_BUF_LEN;
-
-	unsigned long rx_status =  *(unsigned long* )(rx_ring + rx_read_ptr_offset);
-  uint rx_size = rx_status >> 16;     // Includes CRC
-
-  pkt_length = rx_size - 4;
-
-	while(1){
-	  
-		tmpCmd = regs->Cmd;
-
-		if(tmpCmd & RxBufEmpty) 
-			break;
-
-	}
-	do {
-	  rx_read_ptr = rx_ring + rx_read_ptr_offset;
-		p_income_pkt = rx_read_ptr + 4;
-		
-		if(rtl8139_packetOK()){
-
-		  	if ( (rx_read_ptr_offset + pkt_length) > RX_BUF_LEN ){
-
-           //wrap around to end of RxBuffer
-           memmove( rx_ring + RX_BUF_LEN , rx_ring,
-           (rx_read_ptr_offset + pkt_length - RX_BUF_LEN));
-        }
-        
-        //copy the packet out here
-        memmove(p_income_pkt, p_income_pkt, pkt_length - 4);//don't copy 4 bytes CRC
-
-        //update Read Pointer
-        rx_read_ptr_offset = (rx_read_ptr_offset + pkt_length + 4 + 3) & RX_READ_POINTER_MASK;
-        //4:for header length(PktLength include 4 bytes CRC)
-        //3:for dword alignment
-
-        regs->CurAddrPacket &= rx_read_ptr_offset - 0x10;
-
-    }
-    else{
-      rtl8139_set_rx_mode();
-      break;
-    }
-    
-    tmpCmd = regs->Cmd;
-    
-    }while (!(tmpCmd & RxBufEmpty));
-        
-    return 1;
+	//nic.cur_rx set to 0
+	nic.cur_rx = 0;
 }
 
 void nicinit() {
@@ -280,19 +196,19 @@ void nicinit() {
   write_pci_config_register(0, i, 0, 0x4, read_pci_config_register(0, i, 0, 0x4) | 0x7);
   
   // Set base address for memory mapped io
-  regs = (volatile struct RTL8139_registers*) read_pci_config_register(0, i, 0, 0x14);
+  nic.regs = (volatile struct RTL8139_registers*) read_pci_config_register(0, i, 0, 0x14);
 
   // Configure interrupt line
   ioapicenable(9, 0);
   ioapicenable(11, 0);
 
   // Set the LWAKE + LWPTN to active high. This should essentially 'power on' the device.
-  regs->Config1 = 0x0;
+  nic.regs->Config1 = 0x0;
   
   //call reset
   rtl8139_reset();
 
-  cprintf("BMSR = %x\n", regs->BasicModeStatus);
+  cprintf("BMSR = %x\n", nic.regs->BasicModeStatus);
 }
 
 void delay(int microseconds) {
@@ -306,59 +222,135 @@ void delay(int microseconds) {
   }
 }
 
-// packet transmission: returns 0 on success, -1 on error/timeout
-int rtl8139_send(void *packet, int length){
+void rtl8139_send(void *packet, int length){
   if (length == 0)
-    return -1;
+    return;
 
   uint len = length;
   volatile uint txstatus;
 
-  memmove(tx_buffer, packet, length);
+  memmove(nic.tx_buffer, packet, length);
 
   //Note: RTL8139 doesn't auto-pad, send minimum payload.
   while (len < ETH_ZLEN){
-    tx_buffer[len++] = '\0';
+    nic.tx_buffer[len++] = '\0';
   }
 
   cprintf("sending %d bytes\n", len);
 
-  *(&regs->TxAddr0 + cur_tx) = V2P((uint)tx_buffer);
+  *(&nic.regs->TxAddr0 + nic.cur_tx) = V2P((uint)nic.tx_buffer);
   txstatus = (TX_FIFO_THRESH << 11 | len) & 0xffffdfff;
-  *(&regs->TxStatus0 + cur_tx) = txstatus;
+  *(&nic.regs->TxStatus0 + nic.cur_tx) = txstatus;
 
-  txstatus = *(&regs->TxStatus0 + cur_tx);
-  /*
-  if (!(status & TxOK)) {
-    cprintf("tx timeout/error (%d usecs), status %x txstatus %x\n",10 * i, status, txstatus);
+  txstatus = *(&nic.regs->TxStatus0 + nic.cur_tx);
+}
 
-    rtl8139_reset();
-    return -1;
-  }
-  */
+int rtl8139_packetOK() {	
+  uint ring_offset = nic.cur_rx % RX_BUF_LEN;	
+	uint rx_status =  *(uint*)(nic.rx_ring + ring_offset);
+	uint rx_size = rx_status >> 16;     // Includes CRC
 
-  // if (status & TxOK)
-		// cur_tx = (cur_tx + 1) % NUM_TX_DESC;
-  // cur_tx = (cur_tx + 1) % NUM_TX_DESC;
-  // cprintf("tx done, status %x txstatus %x\n",status, txstatus);
-  return 0;
+	int pkt_size = rx_size - 4;
+	
+  int bad_packet = (rx_status & RUNT) || (rx_status & LongPkt) || (rx_status & CRC) || (rx_status & FAErr); 
+
+	if(!bad_packet && (rx_status & ROK)) {
+     
+	  if(pkt_size > RX_MAX_PKT_LENGTH || rx_size < RX_MIN_PKT_LENGTH) {
+		  
+		  return 0;
+		}
+
+	  nic.packets_received_good++;
+	  nic.byte_received += pkt_size;
+	  
+		return 1;
+	}
+
+  else
+	  return 0;
+}
+
+int rtl8139_receive() { 
+  uchar tmpCmd;
+	uint pkt_length;
+	uchar *p_income_pkt, *rx_read_ptr;
+  uint rx_read_ptr_offset = nic.cur_rx % RX_BUF_LEN;
+
+	uint rx_status =  *(uint*)(nic.rx_ring + rx_read_ptr_offset);
+  uint rx_size = rx_status >> 16;     // Includes CRC
+
+  pkt_length = rx_size - 4;
+
+	while(1){
+	  
+		tmpCmd = nic.regs->Cmd;
+
+		if(tmpCmd & RxBufEmpty) 
+			break;
+
+	}
+	do {
+	  rx_read_ptr = nic.rx_ring + rx_read_ptr_offset;
+		p_income_pkt = rx_read_ptr + 4;
+		
+		if(rtl8139_packetOK()){
+
+		  	if ( (rx_read_ptr_offset + pkt_length) > RX_BUF_LEN ){
+
+           //wrap around to end of RxBuffer
+           memmove( nic.rx_ring + RX_BUF_LEN , nic.rx_ring,
+           (rx_read_ptr_offset + pkt_length - RX_BUF_LEN));
+        }
+        
+        //copy the packet out here
+        memmove(p_income_pkt, p_income_pkt, pkt_length - 4);//don't copy 4 bytes CRC
+
+        //update Read Pointer
+        rx_read_ptr_offset = (rx_read_ptr_offset + pkt_length + 4 + 3) & RX_READ_POINTER_MASK;
+        //4:for header length(PktLength include 4 bytes CRC)
+        //3:for dword alignment
+
+        nic.regs->CurAddrPacket &= rx_read_ptr_offset - 0x10;
+    }
+    else{
+      rtl8139_set_rx_mode();
+      break;
+    }
+    
+    tmpCmd = nic.regs->Cmd;
+    
+  }while (!(tmpCmd & RxBufEmpty));
+        
+  return 1;
 }
 
 void nicintr() {
-  if (regs->ISR & TxOK) {
-    cprintf("ISR before %x\n", regs->ISR);
-    volatile uint status = regs->ISR;
+  volatile uint status = nic.regs->ISR;
+
+  if (status & TxOK) {
     status &= TxOK;
-    regs->ISR = status;
-    cprintf("ISR after %x\n", regs->ISR);
-    cur_tx = (cur_tx + 1) % NUM_TX_DESC;
+    nic.regs->ISR = status;
+    nic.cur_tx = (nic.cur_tx + 1) % NUM_TX_DESC;
   }
-  
-  else if (regs->ISR & TxErr) {
+ 
+  if (status & TxErr) {
     cprintf("Transmission Error\n");
-    rtl8139_reset();
-    volatile uint status = regs->ISR;
     status &= TxErr;
-    regs->ISR = status;
+    nic.regs->ISR = status;
+    rtl8139_reset();
+  }
+
+  if (status & RxOK) {
+    rtl8139_receive();
+    status &= RxOK;
+    nic.regs->ISR = status;
+  }
+
+  if (status & RxErr) {
+    cprintf("Reception Error\n");
+    status &= RxErr;
+    nic.regs->ISR = status;
+    rtl8139_reset();
   }
 }

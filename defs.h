@@ -126,7 +126,7 @@ void            wakeup(void*);
 void            yield(void);
 
 // rtl8139.c
-int rtl8139_send(void *packet, int length);
+void rtl8139_send(void *packet, int length);
 void nicinit();
 void nicintr();
 
