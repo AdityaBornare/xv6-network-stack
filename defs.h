@@ -130,6 +130,9 @@ void rtl8139_send(void *packet, int length);
 void nicinit();
 void nicintr();
 
+// ether.c
+void send_ether_packet(unsigned char* destMAC,unsigned char* srcMAC,unsigned short ethertype,unsigned char* payload);
+
 // swtch.S
 void            swtch(struct context**, struct context*);
 

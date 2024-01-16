@@ -4,3 +4,5 @@ typedef struct {
           unsigned short          ethertype;
           unsigned char          data[1500];
 } ether_pack;
+
+void send_ether_packet(unsigned char* destMAC,unsigned char* srcMAC,unsigned short ethertype,unsigned char* payload);

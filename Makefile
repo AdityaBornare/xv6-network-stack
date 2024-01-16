@@ -28,6 +28,7 @@ OBJS = \
 	uart.o\
 	vectors.o\
 	vm.o\
+  ether.o\
 	rtl8139.o\
 
 # Cross-compiling (e.g., on Mac OS X)
