@@ -102,7 +102,7 @@ sys_test(void)
   unsigned char payload[] = "Hello, this is a test packet!";
 
   // Send the Ethernet packet
-  send_ether_packet(destMAC,srcMAC,ethertype,payload);
+  ether_send(destMAC, srcMAC, ethertype, payload);
 
   return 0;
 }

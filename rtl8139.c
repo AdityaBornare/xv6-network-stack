@@ -11,7 +11,7 @@
 #define NUM_TX_DESC	4              // Number of Tx descriptor registers
 #define ETH_FRAME_LEN	1514	       // Max. octets in frame sans FCS
 #define TX_BUF_SIZE	ETH_FRAME_LEN
-#define ETH_ZLEN	60	             // Min. octets in frame sans FCS 
+#define ETH_ZLEN	60	             // Min. octets in frame sans FCS
 #define RX_BUF_LEN_IDX 0           // 0, 1, 2 is allowed - 8k ,16k ,32K rx buffer
 #define RTL_TIMEOUT 100000
 #define ETIMEDOUT -1  		         //connection timed out
@@ -161,7 +161,7 @@ void rtl8139_reset(){
   // Set transfer thresholds
   nic.regs->RxConfig = rx_config;
   nic.regs->TxConfig = (TX_DMA_BURST << 8) | 0x03000000;
-  
+
   // Set full duplex mode
   nic.regs->BasicModeCtrl |= 0x0100;
 
@@ -194,7 +194,7 @@ void nicinit() {
 
   // enable PCI bus mastering
   write_pci_config_register(0, i, 0, 0x4, read_pci_config_register(0, i, 0, 0x4) | 0x7);
-  
+
   // Set base address for memory mapped io
   nic.regs = (volatile struct RTL8139_registers*) read_pci_config_register(0, i, 0, 0x14);
 
@@ -204,7 +204,7 @@ void nicinit() {
 
   // Set the LWAKE + LWPTN to active high. This should essentially 'power on' the device.
   nic.regs->Config1 = 0x0;
-  
+
   //call reset
   rtl8139_reset();
 
@@ -245,25 +245,25 @@ void rtl8139_send(void *packet, int length){
   txstatus = *(&nic.regs->TxStatus0 + nic.cur_tx);
 }
 
-int rtl8139_packetOK() {	
-  uint ring_offset = nic.cur_rx % RX_BUF_LEN;	
+int rtl8139_packetOK() {
+  uint ring_offset = nic.cur_rx % RX_BUF_LEN;
 	uint rx_status =  *(uint*)(nic.rx_ring + ring_offset);
 	uint rx_size = rx_status >> 16;     // Includes CRC
 
 	int pkt_size = rx_size - 4;
-	
-  int bad_packet = (rx_status & RUNT) || (rx_status & LongPkt) || (rx_status & CRC) || (rx_status & FAErr); 
+
+  int bad_packet = (rx_status & RUNT) || (rx_status & LongPkt) || (rx_status & CRC) || (rx_status & FAErr);
 
 	if(!bad_packet && (rx_status & ROK)) {
-     
+
 	  if(pkt_size > RX_MAX_PKT_LENGTH || rx_size < RX_MIN_PKT_LENGTH) {
-		  
+
 		  return 0;
 		}
 
 	  nic.packets_received_good++;
 	  nic.byte_received += pkt_size;
-	  
+
 		return 1;
 	}
 
@@ -271,7 +271,7 @@ int rtl8139_packetOK() {
 	  return 0;
 }
 
-int rtl8139_receive() { 
+int rtl8139_receive() {
   uchar tmpCmd;
 	uint pkt_length;
 	uchar *p_income_pkt, *rx_read_ptr;
@@ -283,45 +283,39 @@ int rtl8139_receive() {
   pkt_length = rx_size - 4;
 
 	while(1){
-	  
 		tmpCmd = nic.regs->Cmd;
-
-		if(tmpCmd & RxBufEmpty) 
+		if(tmpCmd & RxBufEmpty)
 			break;
-
 	}
 	do {
 	  rx_read_ptr = nic.rx_ring + rx_read_ptr_offset;
 		p_income_pkt = rx_read_ptr + 4;
-		
+
 		if(rtl8139_packetOK()){
+		  if ( (rx_read_ptr_offset + pkt_length) > RX_BUF_LEN ){
+        //wrap around to end of RxBuffer
+        memmove( nic.rx_ring + RX_BUF_LEN , nic.rx_ring,
+        (rx_read_ptr_offset + pkt_length - RX_BUF_LEN));
+      }
 
-		  	if ( (rx_read_ptr_offset + pkt_length) > RX_BUF_LEN ){
+      //copy the packet out here
+      memmove(p_income_pkt, p_income_pkt, pkt_length - 4);//don't copy 4 bytes CRC
 
-           //wrap around to end of RxBuffer
-           memmove( nic.rx_ring + RX_BUF_LEN , nic.rx_ring,
-           (rx_read_ptr_offset + pkt_length - RX_BUF_LEN));
-        }
-        
-        //copy the packet out here
-        memmove(p_income_pkt, p_income_pkt, pkt_length - 4);//don't copy 4 bytes CRC
-
-        //update Read Pointer
-        rx_read_ptr_offset = (rx_read_ptr_offset + pkt_length + 4 + 3) & RX_READ_POINTER_MASK;
-        //4:for header length(PktLength include 4 bytes CRC)
-        //3:for dword alignment
-
-        nic.regs->CurAddrPacket &= rx_read_ptr_offset - 0x10;
+      //update Read Pointer
+      rx_read_ptr_offset = (rx_read_ptr_offset + pkt_length + 4 + 3) & RX_READ_POINTER_MASK;
+      //4:for header length(PktLength include 4 bytes CRC)
+      //3:for dword alignment
+      nic.regs->CurAddrPacket &= rx_read_ptr_offset - 0x10;
     }
     else{
       rtl8139_set_rx_mode();
       break;
     }
-    
+
     tmpCmd = nic.regs->Cmd;
-    
+
   }while (!(tmpCmd & RxBufEmpty));
-        
+
   return 1;
 }
 
@@ -333,7 +327,7 @@ void nicintr() {
     nic.regs->ISR = status;
     nic.cur_tx = (nic.cur_tx + 1) % NUM_TX_DESC;
   }
- 
+
   if (status & TxErr) {
     cprintf("Transmission Error\n");
     status &= TxErr;
