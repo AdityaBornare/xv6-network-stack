@@ -1,3 +1,5 @@
+#include "stddef.h"
+
 struct buf;
 struct context;
 struct file;
@@ -23,7 +25,7 @@ void            consoleintr(int(*)(void));
 void            panic(char*) __attribute__((noreturn));
 
 // ether.c
-void ether_send(unsigned char* destMAC,unsigned char* srcMAC,unsigned short ethertype,unsigned char* payload);
+void ether_send(unsigned char* destMAC,unsigned char* srcMAC,unsigned short type,unsigned char* payload,size_t plen);
 
 // exec.c
 int             exec(char*, char**);

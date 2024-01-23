@@ -1,25 +1,36 @@
 #include "types.h"
 #include "defs.h"
 #include "x86.h"
+#include "stddef.h"
 #include "ether.h"
 
-void ether_send(unsigned char* destMAC,unsigned char* srcMAC,unsigned short ethertype,unsigned char* payload){
-  ether_pack packet;
+void ether_send(unsigned char* destMAC,unsigned char* srcMAC,unsigned short type,unsigned char* payload,size_t plen){
+  ether_hdr *header;
+  size_t flen;
+
+  cprintf("size of playload : %d\n",plen);
+  unsigned char frame[ETHERNET_FRAME_SIZE_MAX];
+
+  header = (ether_hdr*)frame;
 
   // Set destination MAC address
   // Example: b0:dc:ef:bf:be:4f
-  memmove(packet.dst, destMAC, sizeof(destMAC));
+  memmove(header->dst, destMAC, sizeof(destMAC));
 
   // Set source MAC address
   // 52:54:98:76:54:32
-  memmove(packet.src, srcMAC, sizeof(srcMAC));
+  memmove(header->src, srcMAC, sizeof(srcMAC));
 
-  // Set EtherType
-  packet.ethertype = ethertype;
+  // Set the type
+  header->type = type;
 
-  // Set data payload
-  memmove(packet.data, payload, sizeof(payload));
+  //Set the payload
+  memmove(header+1, payload, plen);
 
-  // Send the Ethernet packet using rtl8139_send
-  rtl8139_send((void*)&packet, sizeof(packet));
+  flen = ETHERNET_HDR_SIZE + plen;
+
+  cprintf("size of frame : %d\n",flen);
+
+  // Send the Ethernet frame using rtl8139_send
+  rtl8139_send((void*)&frame, flen);
 }
