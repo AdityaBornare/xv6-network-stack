@@ -23,7 +23,7 @@ void            consoleintr(int(*)(void));
 void            panic(char*) __attribute__((noreturn));
 
 // ether.c
-void ether_send(unsigned char* destMAC,unsigned char* srcMAC,unsigned short type,unsigned char* payload,int plen);
+void            ether_send(unsigned char* destMAC, unsigned char* srcMAC, unsigned short type, unsigned char* payload, uint plen);
 
 // exec.c
 int             exec(char*, char**);
@@ -129,9 +129,9 @@ void            wakeup(void*);
 void            yield(void);
 
 // rtl8139.c
-void rtl8139_send(void *packet, int length);
-void nicinit();
-void nicintr();
+void            rtl8139_send(void *packet, int length);
+void            nicinit();
+void            nicintr();
 
 // swtch.S
 void            swtch(struct context**, struct context*);

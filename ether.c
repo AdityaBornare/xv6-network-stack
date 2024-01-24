@@ -3,11 +3,11 @@
 #include "x86.h"
 #include "ether.h"
 
-void ether_send(unsigned char* destMAC,unsigned char* srcMAC,unsigned short type,unsigned char* payload,int plen){
+void ether_send(unsigned char* destMAC, unsigned char* srcMAC, unsigned short type, unsigned char* payload, uint plen){
   ether_hdr *header;
-  int flen;
+  uint flen;
 
-  cprintf("size of playload : %d\n",plen);
+  cprintf("size of playload : %d\n", plen);
   unsigned char frame[ETHERNET_FRAME_SIZE_MAX];
 
   header = (ether_hdr*)frame;
@@ -24,7 +24,7 @@ void ether_send(unsigned char* destMAC,unsigned char* srcMAC,unsigned short type
   header->type = type;
 
   //Set the payload
-  memmove(header+1, payload, plen);
+  memmove(header + 1, payload, plen);
 
   flen = ETHERNET_HDR_SIZE + plen;
 

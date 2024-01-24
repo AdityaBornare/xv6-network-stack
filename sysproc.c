@@ -93,7 +93,7 @@ sys_uptime(void)
 int
 sys_test(void)
 {
-  unsigned char destMAC[] = {0xb0, 0xdc, 0xef, 0xbf, 0xbe, 0x4f};
+  unsigned char destMAC[] = {0x52, 0x54, 0x98, 0x76, 0x54, 0x32};
 
   unsigned char srcMAC[] = {0x52, 0x54, 0x98, 0x76, 0x54, 0x32};
 
@@ -101,7 +101,8 @@ sys_test(void)
 
   unsigned char payload[] = "Testing send";
 
-  int plen = sizeof(payload);
+  uint plen = sizeof(payload);
+  cprintf("%d\n", plen);
 
   // Send the Ethernet packet
   ether_send(destMAC, srcMAC, type, payload, plen);
