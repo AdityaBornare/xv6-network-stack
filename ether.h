@@ -8,9 +8,7 @@
 #define ETHERNET_TYPE_IP   0x0800
 
 typedef struct {
-          unsigned char          dst[6];
-          unsigned char          src[6];
-          unsigned short           type;
+    unsigned char          dst[6];
+    unsigned char          src[6];
+    unsigned short           type;
 } ether_hdr;
-
-void ether_send(unsigned char* destMAC,unsigned char* srcMAC,unsigned short type,unsigned char* payload,size_t plen);

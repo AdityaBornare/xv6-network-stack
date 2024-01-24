@@ -1,12 +1,11 @@
 #include "types.h"
 #include "defs.h"
 #include "x86.h"
-#include "stddef.h"
 #include "ether.h"
 
-void ether_send(unsigned char* destMAC,unsigned char* srcMAC,unsigned short type,unsigned char* payload,size_t plen){
+void ether_send(unsigned char* destMAC,unsigned char* srcMAC,unsigned short type,unsigned char* payload,int plen){
   ether_hdr *header;
-  size_t flen;
+  int flen;
 
   cprintf("size of playload : %d\n",plen);
   unsigned char frame[ETHERNET_FRAME_SIZE_MAX];

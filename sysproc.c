@@ -6,7 +6,6 @@
 #include "memlayout.h"
 #include "mmu.h"
 #include "proc.h"
-#include "stddef.h"
 
 int
 sys_fork(void)
@@ -100,9 +99,9 @@ sys_test(void)
 
   unsigned short type = 0x0800;
 
-  unsigned char payload[] = "Testing .........................";
+  unsigned char payload[] = "Testing send";
 
-  size_t plen = sizeof(payload);
+  int plen = sizeof(payload);
 
   // Send the Ethernet packet
   ether_send(destMAC, srcMAC, type, payload, plen);
