@@ -14,11 +14,11 @@ void ether_send(unsigned char* destMAC, unsigned char* srcMAC, unsigned short ty
 
   // Set destination MAC address
   // Example: b0:dc:ef:bf:be:4f
-  memmove(header->dst, destMAC, sizeof(destMAC));
+  memmove(header->dst, destMAC, MAC_SIZE);
 
   // Set source MAC address
   // 52:54:98:76:54:32
-  memmove(header->src, srcMAC, sizeof(srcMAC));
+  memmove(header->src, srcMAC, MAC_SIZE);
 
   // Set the type
   header->type = type;

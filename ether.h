@@ -6,9 +6,10 @@
 #define ETHERNET_PAYLOAD_SIZE_MAX (ETHERNET_FRAME_SIZE_MAX - (ETHERNET_HDR_SIZE + ETHERNET_TRL_SIZE))
 
 #define ETHERNET_TYPE_IP   0x0800
+#define MAC_SIZE 6
 
 typedef struct {
-  unsigned char dst[6];
-  unsigned char src[6];
+  unsigned char dst[MAC_SIZE];
+  unsigned char src[MAC_SIZE];
   unsigned short type;
 } ether_hdr;
