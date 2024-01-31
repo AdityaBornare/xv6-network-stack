@@ -174,7 +174,7 @@ void rtl8139_reset(){
   // Start the chip's Tx and Rx process
   nic.regs->MissedPacketCounter = 0;
   rtl8139_set_rx_mode();
-  nic.regs->Cmd = CmdTxEnb | CmdRxEnb;
+  nic.regs->Cmd = CmdTxEnb | CmdRxEnb | RxBufEmpty;
 
   nic.regs->ISR = 0xff;
   // Enable interrupts by setting the interrupt mask
@@ -208,7 +208,7 @@ void nicinit() {
   //call reset
   rtl8139_reset();
 
-  cprintf("BMSR = %x\n", nic.regs->BasicModeStatus);
+  cprintf("CMD = %x\n", nic.regs->Cmd);
 }
 
 void delay(int microseconds) {
@@ -253,11 +253,12 @@ int rtl8139_packetOK() {
 	int pkt_size = rx_size - 4;
 
   int bad_packet = (rx_status & RUNT) || (rx_status & LongPkt) || (rx_status & CRC) || (rx_status & FAErr);
-
+  cprintf("bad packet = %x\n", bad_packet);
+  cprintf("status = %x\n", rx_status);
 	if(!bad_packet && (rx_status & ROK)) {
-
+    cprintf("pkt_size = %d\n", pkt_size);
 	  if(pkt_size > RX_MAX_PKT_LENGTH || rx_size < RX_MIN_PKT_LENGTH) {
-
+      cprintf("inside\n");
 		  return 0;
 		}
 
@@ -272,7 +273,7 @@ int rtl8139_packetOK() {
 }
 
 int rtl8139_receive() {
-  uchar tmpCmd;
+  volatile uchar tmpCmd;
 	uint pkt_length;
 	uchar *p_income_pkt, *rx_read_ptr;
   uint rx_read_ptr_offset = nic.cur_rx % RX_BUF_LEN;
@@ -282,16 +283,23 @@ int rtl8139_receive() {
 
   pkt_length = rx_size - 4;
 
+  cprintf("CMD = %x\n", nic.regs->Cmd);
+  /* for(int i = 0; i < RX_BUF_LEN; i++)
+    cprintf("%x ", nic.rx_ring[i]); */
+
 	while(1){
+    cprintf("stuck in while!\n");
 		tmpCmd = nic.regs->Cmd;
-		if(tmpCmd & RxBufEmpty)
+		if(!(tmpCmd & RxBufEmpty))
 			break;
 	}
+
 	do {
 	  rx_read_ptr = nic.rx_ring + rx_read_ptr_offset;
 		p_income_pkt = rx_read_ptr + 4;
 
 		if(rtl8139_packetOK()){
+      cprintf("packet OK\n");
 		  if ( (rx_read_ptr_offset + pkt_length) > RX_BUF_LEN ){
         //wrap around to end of RxBuffer
         memmove( nic.rx_ring + RX_BUF_LEN , nic.rx_ring,
@@ -299,7 +307,7 @@ int rtl8139_receive() {
       }
 
       //copy the packet out here
-      memmove(p_income_pkt, p_income_pkt, pkt_length - 4);//don't copy 4 bytes CRC
+      memmove(p_income_pkt, p_income_pkt, pkt_length - 4);  //don't copy 4 bytes CRC
 
       //update Read Pointer
       rx_read_ptr_offset = (rx_read_ptr_offset + pkt_length + 4 + 3) & RX_READ_POINTER_MASK;
@@ -321,6 +329,7 @@ int rtl8139_receive() {
 
 void nicintr() {
   volatile uint status = nic.regs->ISR;
+  cprintf("CMD = %x\n", nic.regs->Cmd);
 
   if (status & TxOK) {
     cprintf("Tx OK\n");
@@ -339,6 +348,7 @@ void nicintr() {
   if (status & RxOK) {
     cprintf("Rx OK\n");
     rtl8139_receive();
+    cprintf("receive done\n");
     status &= RxOK;
     nic.regs->ISR = status;
   }
