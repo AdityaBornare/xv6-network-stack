@@ -1,22 +1,30 @@
 #include "types.h"
 #include "defs.h"
 #include "x86.h"
+#include "memlayout.h"
+#include "traps.h"
 
-#define TX_FIFO_THRESH 256	      // In bytes, rounded down to 32 byte units
-#define RX_FIFO_THRESH 4          // Rx buffer level before first PCI xfer
-#define RX_DMA_BURST 4            // Calculate as 16 << 4 = 256 bytes
-#define TX_DMA_BURST 4            // Calculate as 16 << 4 = 256 bytes
-#define NUM_TX_DESC	4             // Number of Tx descriptor registers
-#define RX_BUF_LEN_IDX 0          // 0, 1, 2 is allowed - 8k ,16k ,32K rx buffer
+#define TX_FIFO_THRESH 256	       // In bytes, rounded down to 32 byte units
+#define RX_FIFO_THRESH 4           // Rx buffer level before first PCI xfer
+#define RX_DMA_BURST 4             // Calculate as 16 << 4 = 256 bytes
+#define TX_DMA_BURST 4             // Calculate as 16 << 4 = 256 bytes
+#define NUM_TX_DESC	4              // Number of Tx descriptor registers
+#define ETH_FRAME_LEN	1514	       // Max. octets in frame sans FCS
+#define TX_BUF_SIZE	ETH_FRAME_LEN
+#define ETH_ZLEN	60	             // Min. octets in frame sans FCS
+#define RX_BUF_LEN_IDX 0           // 0, 1, 2 is allowed - 8k ,16k ,32K rx buffer
+#define RTL_TIMEOUT 100000
+#define ETIMEDOUT -1  		         //connection timed out
 
 #define RX_BUF_LEN (8192 << RX_BUF_LEN_IDX)
+#define RX_MAX_PKT_LENGTH 1514
+#define RX_MIN_PKT_LENGTH 60
+#define RX_READ_POINTER_MASK ~3
 
 #define RTL_REG_RXCONFIG_ACCEPTBROADCAST 0x08
 #define RTL_REG_RXCONFIG_ACCEPTMULTICAST 0x04
 #define RTL_REG_RXCONFIG_ACCEPTMYPHYS 0x02
 #define RTL_REG_RXCONFIG_ACCEPTALLPHYS 0x01
-
-static unsigned char rx_ring[RX_BUF_LEN + 16] __attribute__((__aligned__(4)));
 
 const uint rx_config = (RX_BUF_LEN_IDX << 11) | (RX_FIFO_THRESH << 13) | (RX_DMA_BURST << 8);
 
@@ -27,7 +35,7 @@ struct RTL8139_registers {
   uchar IDR3;                   // 0x03
   uchar IDR4;                   // 0x04
   uchar IDR5;                   // 0x05
-  ushort reservedi0;            // 0x06 - 0x07
+  ushort reserved0;            // 0x06 - 0x07
   uchar MAR0;                   // 0x08
   uchar MAR1;                   // 0x09
   uchar MAR2;                   // 0x0A
@@ -64,7 +72,25 @@ struct RTL8139_registers {
   uchar MediaStatus;            // 0x58
   uchar config3;                // 0x59
   uchar Config4;                // 0x5A
+  uchar reserved2;              // 0x5B
+  ushort MulIntrSelect;         // 0x5c - 0x5D
+  uchar PciRevId;               // 0x5E
+  uchar reserved3;              // 0x5F
+  ushort TxStatusAllDesc;       // 0x60 - 0x61
+  ushort BasicModeCtrl;         // 0x62 - 0x62
+  ushort BasicModeStatus;       // 0x64 - 0x65
 };
+
+static struct nic {
+  volatile struct RTL8139_registers *regs;
+  unsigned char tx_buffer[TX_BUF_SIZE] __attribute__((__aligned__(4)));
+  unsigned char rx_ring[RX_BUF_LEN + 16] __attribute__((__aligned__(4)));
+  unsigned int cur_tx;
+  uchar cur_rx;
+  uchar packets_received_good;
+  uchar byte_received;
+  uint pci_device_no;
+} nic;
 
 enum CmdBits {
   RxBufEmpty = 0x01,
@@ -80,134 +106,249 @@ enum IntrStatusBits {
   TxErr      = 0x0008,
   RxOverflow = 0x0010,
   RxUnderrun = 0x0020,
-  RxFIFOOver = 0x0040,
+  RxFIFOover = 0x0040,
   PCSTimeout = 0x4000,
   PCIErr     = 0x8000,
+
 };
 
-struct RTL8139_registers *regs;
+enum PacketHeader {
+	ROK        = 0x0001,
+	FAErr      = 0x0002,
+	CRC        = 0x0004,
+	LongPkt    = 0x0008,
+	RUNT       = 0x0010,
+	ISE        = 0x0020,
+	BAR        = 0x2000,
+	PAM        = 0x4000,
+	MAR        = 0x8000,
+};
 
-uint read_pci_config_register(uchar bus, uchar device, uchar function, uchar offset) {
-  uint address = (1 << 31) |   // Enable bit
-  ((uint)bus << 16) |          // Bus number
-  ((uint)device << 11) |       // Device number
-  ((uint)function << 8) |      // Function numbe
-  (offset & 0xfc);             // Register offset (rounded down to nearest multiple of 4)
+struct RxStats{
+  uchar rx_errors;
+  uchar rx_frame_errors;
+  uchar rx_length_errors;
+  uchar rx_crc_errors;
+  uchar rx_dropped;
+};
 
-  // Write address to address port
-  outl(0xcf8, address);
-
-  // Read data from data port
-  return inl(0xcfc);
-}
-
-void write_pci_config_register(uchar bus, uchar device, uchar function, uchar offset, uint data) {
-  uint address = (1 << 31) |   // Enable bit
-  ((uint)bus << 16) |          // Bus number
-  ((uint)device << 11) |       // Device number
-  ((uint)function << 8) |      // Function numbe
-  (offset & 0xfc);             // Register offset (rounded down to nearest multiple of 4)
-
-  // Write address to address port
-  outl(0xcf8, address);
-
-  // write data to data port
-  outl(0xcfc, data);
-}
+struct RxStats RxStats;
 
 void rtl8139_set_rx_mode() {
   uint rx_mode = RTL_REG_RXCONFIG_ACCEPTBROADCAST | RTL_REG_RXCONFIG_ACCEPTMULTICAST | RTL_REG_RXCONFIG_ACCEPTMYPHYS;
-  regs->RxConfig = rx_config | rx_mode;
-  *((uint*)&regs->MAR0) = 0xffffffff;
-  *((uint*)&regs->MAR4) = 0xffffffff;
+  nic.regs->RxConfig = rx_config | rx_mode;
+  *((uint*)&nic.regs->MAR0) = 0xffffffff;
+  *((uint*)&nic.regs->MAR4) = 0xffffffff;
 }
 
-void rtl8139_nicinit() {
+void rtl8139_reset(){
+  // Software reset
+  nic.regs->Cmd = CmdReset;
+  nic.cur_tx = 0;
+
+  // Check that the chip has finished the reset
+  for (int j = 1000; j > 0; j--) {
+    if ((nic.regs->Cmd & 0x10) == 0){
+      break;
+    }
+  }
+
+  // Change operating mode before writing to config registers
+  nic.regs->Cfg9346 =  0xC0;
+
+  // Set the RE and TE bits in command register before setting transfer thresholds
+  nic.regs->Cmd = CmdTxEnb | CmdRxEnb;
+
+  // Set transfer thresholds
+  nic.regs->RxConfig = rx_config;
+  nic.regs->TxConfig = (TX_DMA_BURST << 8) | 0x03000000;
+
+  // Set full duplex mode
+  nic.regs->BasicModeCtrl |= 0x0100;
+
+  // Change operating mode back to the normal network communication mode
+  nic.regs->Cfg9346 = 0x00;
+
+  // Initialize rx buffer
+  nic.regs->RxBufStart = V2P((uint)nic.rx_ring);
+
+  // Start the chip's Tx and Rx process
+  nic.regs->MissedPacketCounter = 0;
+  rtl8139_set_rx_mode();
+  nic.regs->Cmd = CmdTxEnb | CmdRxEnb | RxBufEmpty;
+
+  nic.regs->ISR = 0xff;
+  // Enable interrupts by setting the interrupt mask
+  nic.regs->IMR = TxOK | RxOK | TxErr;
+
+	//nic.cur_rx set to 0
+	nic.cur_rx = 0;
+}
+
+void nicinit() {
   // Search in PCI configuration space
   int i = 0;
   for(i = 0; i < 32; i++) {
     if(read_pci_config_register(0, i, 0, 0) == 0x813910ec)
       break;
   }
+  nic.pci_device_no = i;
 
   // enable PCI bus mastering
   write_pci_config_register(0, i, 0, 0x4, read_pci_config_register(0, i, 0, 0x4) | 0x7);
 
   // Set base address for memory mapped io
-  regs = (struct RTL8139_registers*) read_pci_config_register(0, i, 0, 0x14);
-  
-  // Set the LWAKE + LWPTN to active high. This should essentially 'power on' the device. 
-  regs->Config1 = 0x0;
+  nic.regs = (volatile struct RTL8139_registers*) read_pci_config_register(0, i, 0, 0x14);
 
-  // Software reset
-  regs->Cmd = CmdReset;
+  // Configure interrupt line
+  ioapicenable(9, 0);
+  ioapicenable(11, 0);
 
-  // Check that the chip has finished the reset
-  for (int j = 1000; j > 0; j--) {
-    if ((regs->Cmd & 0x10) == 0){
+  // Set the LWAKE + LWPTN to active high. This should essentially 'power on' the device.
+  nic.regs->Config1 = 0x0;
+
+  //call reset
+  rtl8139_reset();
+
+  cprintf("CMD = %x\n", nic.regs->Cmd);
+}
+
+void delay(int microseconds) {
+  uint start_ticks = ticks;
+
+  // Convert microseconds to ticks (assuming 10ms timer interrupt)
+  uint desired_ticks = (microseconds * 10) / 1000;
+
+  while ((ticks - start_ticks) < desired_ticks) {
+    // Wait until desired number of ticks has passed
+  }
+}
+
+void rtl8139_send(void *packet, int length){
+  if (length == 0)
+    return;
+
+  uint len = length;
+  volatile uint txstatus;
+
+  memmove(nic.tx_buffer, packet, length);
+
+  //Note: RTL8139 doesn't auto-pad, send minimum payload.
+  while (len < ETH_ZLEN){
+    nic.tx_buffer[len++] = '\0';
+  }
+
+  cprintf("sending %d bytes\n", len);
+
+  *(&nic.regs->TxAddr0 + nic.cur_tx) = V2P((uint)nic.tx_buffer);
+  txstatus = (TX_FIFO_THRESH << 11 | len) & 0xffffdfff;
+  *(&nic.regs->TxStatus0 + nic.cur_tx) = txstatus;
+
+  txstatus = *(&nic.regs->TxStatus0 + nic.cur_tx);
+}
+
+int rtl8139_packetOK() {
+  uint ring_offset = nic.cur_rx % RX_BUF_LEN;
+	uint rx_status =  *(uint*)(nic.rx_ring + ring_offset);
+	uint rx_size = rx_status >> 16;     // Includes CRC
+	int pkt_size = rx_size - 4;
+  int bad_packet = (rx_status & RUNT) || (rx_status & LongPkt) || (rx_status & CRC) || (rx_status & FAErr);
+
+	if(!bad_packet && (rx_status & ROK)) {
+	  if(pkt_size > RX_MAX_PKT_LENGTH || rx_size < RX_MIN_PKT_LENGTH)
+		  return 0;
+
+	  nic.packets_received_good++;
+	  nic.byte_received += pkt_size;
+
+		return 1;
+	}
+
+  else
+	  return 0;
+}
+
+int rtl8139_receive() {
+  volatile uchar tmpCmd;
+	uint pkt_length;
+	uchar *p_income_pkt, *rx_read_ptr;
+  uint rx_read_ptr_offset = nic.cur_rx % RX_BUF_LEN;
+	uint rx_status =  *((uint*)(nic.rx_ring + rx_read_ptr_offset));
+  uint rx_size = rx_status >> 16;     // Includes CRC
+  pkt_length = rx_size - 4;
+
+	while(1){
+		tmpCmd = nic.regs->Cmd;
+		if(!(tmpCmd & RxBufEmpty))
+			break;
+	}
+  cprintf("rx_read_ptr_offset = %d\n", rx_read_ptr_offset);
+	do {
+	  rx_read_ptr = nic.rx_ring + rx_read_ptr_offset;
+		p_income_pkt = rx_read_ptr + 4;
+
+		if(rtl8139_packetOK()) {
+      cprintf("packet OK\n");
+		  if ( (rx_read_ptr_offset + pkt_length) > RX_BUF_LEN ){
+        // wrap around to end of RxBuffer
+        memmove( nic.rx_ring + RX_BUF_LEN , nic.rx_ring,
+        (rx_read_ptr_offset + pkt_length - RX_BUF_LEN));
+      }
+
+      // copy the packet out here
+      memmove(p_income_pkt, p_income_pkt, pkt_length - 4);  //don't copy 4 bytes CRC
+
+      // pass data to upper layer 
+      ether_receive((void*) p_income_pkt, pkt_length);
+
+      // update Read Pointer
+      rx_read_ptr_offset = (rx_read_ptr_offset + rx_size + 4 + 3) & RX_READ_POINTER_MASK;
+      // 4:for header length(PktLength include 4 bytes CRC)
+      // 3:for dword alignment 
+      nic.cur_rx = rx_read_ptr_offset;
+      nic.regs->CurAddrPacket &= rx_read_ptr_offset - 0x10;
+    }
+    else {
+      rtl8139_set_rx_mode();
       break;
     }
-  }
 
-  // Change operating mode before writing to config registers
-  regs->Cfg9346 =  0xC0;
-  
-  // Set the RE and TE bits in command register before setting transfer thresholds
-  regs->Cmd = CmdTxEnb | CmdRxEnb;
-  
-  // Set transfer thresholds (accept no frames yet!)
-  regs->RxConfig = rx_config;
-  regs->TxConfig = (TX_DMA_BURST << 8) | 0x03000000;
-  
-  // Change operating mode back to the normal network communication mode
-  regs->Cfg9346 = 0x00;
+    tmpCmd = nic.regs->Cmd;
 
-  // Initialize rx buffer
-  regs->RxBufStart = (uint)rx_ring;
+  } while ((tmpCmd & RxBufEmpty));
 
-  // Start the chip's Tx and Rx process
-  regs->MissedPacketCounter = 0;
-  rtl8139_set_rx_mode();
-  regs->Cmd = CmdTxEnb | CmdRxEnb;
-
-  // Enable all known interrupts by setting the interrupt mask
-  regs->IMR = PCIErr | PCSTimeout | RxUnderrun | RxOverflow | RxFIFOOver | TxErr | TxOK | RxErr | RxOK;
+  return 1;
 }
 
-/*
-void nicinit() {
-  int i;
-  for(i = 0; i < 32; i++) {
-    if(read_pci_config_register(0, i, 0, 0) == 0x813910ec)
-      break;
+void nicintr() {
+  volatile uint status = nic.regs->ISR;
+  cprintf("CMD = %x\n", nic.regs->Cmd);
+
+  if (status & TxOK) {
+    cprintf("Tx OK\n");
+    status &= TxOK;
+    nic.regs->ISR = status;
+    nic.cur_tx = (nic.cur_tx + 1) % NUM_TX_DESC;
   }
-  
-  // Set base io address
-  ioaddr = read_pci_config_register(0, i, 0, 0x10) & 0x3;
 
-  // enable PCI bus mastering
-  write_pci_config_register(0, i, 0, 0x4, read_pci_config_register(0, i, 0, 0x4) | 0x7);
-
-  outb( ioaddr + 0x52, 0x0);
-
-  // software reset
-  outb(ioaddr + 0x37, 0x10);
-  
-  // Check that the chip has finished the reset
-  for (i = 1000; i > 0; i--) {
-    if ((inb(ioaddr + 0x37) & 0x10) == 0) break;
+  if (status & TxErr) {
+    cprintf("Transmission Error\n");
+    status &= TxErr;
+    nic.regs->ISR = status;
+    rtl8139_reset();
   }
-  cprintf("%d\n", i);
-  cprintf("%x\n", ioaddr);
- 
- // outl(ioaddr + 0x30, (uint)rx_ring);
-  outw(ioaddr + 0x3c, 0x0005);
- 
-  // (1 << 7) is the WRAP bit, 0xf is AB+AM+APM+AAP
-  outl(ioaddr + 0x44, 0xf | (1 << 7)); 
- 
-  // Sets the RE and TE bits in command register  
-  outb(ioaddr + 0x37, 0x0C);
-  cprintf("%x\n", inb(ioaddr + 0x58));
+
+  if (status & RxOK) {
+    cprintf("Rx OK\n");
+    rtl8139_receive();
+    status &= RxOK;
+    nic.regs->ISR = status;
+  }
+
+  if (status & RxErr) {
+    cprintf("Reception Error\n");
+    status &= RxErr;
+    nic.regs->ISR = status;
+    rtl8139_reset();
+  }
 }
-*/

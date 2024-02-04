@@ -91,10 +91,21 @@ sys_uptime(void)
 }
 
 int
-sys_test(void) 
+sys_test(void)
 {
-  cprintf("Inside the kernel\n");
-  rtl8139_nicinit();
+  unsigned char destMAC[] = {0x52, 0x54, 0x98, 0x76, 0x54, 0x32};
+
+  unsigned char srcMAC[] = {0x52, 0x54, 0x98, 0x76, 0x54, 0x33};
+
+  unsigned short type = 0x0000;
+
+  unsigned char payload[] = "Testing send";
+
+  uint plen = sizeof(payload);
+  cprintf("%d\n", plen);
+
+  // Send the Ethernet packet
+  ether_send(destMAC, srcMAC, type, payload, plen);
+
   return 0;
 }
-
