@@ -225,8 +225,13 @@ CPUS := 2
 endif
 QEMUOPTS = -drive file=fs.img,index=1,media=disk,format=raw -drive file=xv6.img,index=0,media=disk,format=raw -smp $(CPUS) -m 512 -nic socket,id=n1,model=rtl8139,mac=52:54:98:76:54:32,listen=:1234 -object filter-dump,id=f1,netdev=n1,file=dump.dat $(QEMUEXTRA)
 
+QEMUOPTS2 = -drive file=fs.img,index=1,media=disk,format=raw -drive file=xv6.img,index=0,media=disk,format=raw -smp $(CPUS) -m 512 -nic socket,id=n1,model=rtl8139,mac=52:54:98:76:54:33,connect=127.0.0.1:1234 -object filter-dump,id=f1,netdev=n1,file=dump.dat $(QEMUEXTRA)
+
 qemu: fs.img xv6.img
 	$(QEMU) -serial mon:stdio $(QEMUOPTS)
+
+vm2: fs.img xv6.img
+	$(QEMU) -serial mon:stdio $(QEMUOPTS2)
 
 qemu-memfs: xv6memfs.img
 	$(QEMU) -drive file=xv6memfs.img,index=0,media=disk,format=raw -smp $(CPUS) -m 256

@@ -89,6 +89,7 @@ static struct nic {
   uchar cur_rx;
   uchar packets_received_good;
   uchar byte_received;
+  uint pci_device_no;
 } nic;
 
 enum CmdBits {
@@ -169,7 +170,7 @@ void rtl8139_reset(){
   nic.regs->Cfg9346 = 0x00;
 
   // Initialize rx buffer
-  nic.regs->RxBufStart = (uint)nic.rx_ring;
+  nic.regs->RxBufStart = V2P((uint)nic.rx_ring);
 
   // Start the chip's Tx and Rx process
   nic.regs->MissedPacketCounter = 0;
@@ -191,6 +192,7 @@ void nicinit() {
     if(read_pci_config_register(0, i, 0, 0) == 0x813910ec)
       break;
   }
+  nic.pci_device_no = i;
 
   // enable PCI bus mastering
   write_pci_config_register(0, i, 0, 0x4, read_pci_config_register(0, i, 0, 0x4) | 0x7);
@@ -249,12 +251,9 @@ int rtl8139_packetOK() {
   uint ring_offset = nic.cur_rx % RX_BUF_LEN;
 	uint rx_status =  *(uint*)(nic.rx_ring + ring_offset);
 	uint rx_size = rx_status >> 16;     // Includes CRC
-
 	int pkt_size = rx_size - 4;
-
   int bad_packet = (rx_status & RUNT) || (rx_status & LongPkt) || (rx_status & CRC) || (rx_status & FAErr);
-  cprintf("bad packet = %x\n", bad_packet);
-  cprintf("status = %x\n", rx_status);
+
 	if(!bad_packet && (rx_status & ROK)) {
     cprintf("pkt_size = %d\n", pkt_size);
 	  if(pkt_size > RX_MAX_PKT_LENGTH || rx_size < RX_MIN_PKT_LENGTH) {
@@ -278,17 +277,15 @@ int rtl8139_receive() {
 	uchar *p_income_pkt, *rx_read_ptr;
   uint rx_read_ptr_offset = nic.cur_rx % RX_BUF_LEN;
 
-	uint rx_status =  *(uint*)(nic.rx_ring + rx_read_ptr_offset);
+	uint rx_status =  *((uint*)(nic.rx_ring + rx_read_ptr_offset));
   uint rx_size = rx_status >> 16;     // Includes CRC
 
   pkt_length = rx_size - 4;
 
-  cprintf("CMD = %x\n", nic.regs->Cmd);
-  /* for(int i = 0; i < RX_BUF_LEN; i++)
-    cprintf("%x ", nic.rx_ring[i]); */
+  for(int i = 0; i < RX_BUF_LEN; i++)
+    cprintf("%x ", nic.rx_ring[i]);
 
 	while(1){
-    cprintf("stuck in while!\n");
 		tmpCmd = nic.regs->Cmd;
 		if(!(tmpCmd & RxBufEmpty))
 			break;
@@ -298,7 +295,7 @@ int rtl8139_receive() {
 	  rx_read_ptr = nic.rx_ring + rx_read_ptr_offset;
 		p_income_pkt = rx_read_ptr + 4;
 
-		if(rtl8139_packetOK()){
+		if(rtl8139_packetOK()) {
       cprintf("packet OK\n");
 		  if ( (rx_read_ptr_offset + pkt_length) > RX_BUF_LEN ){
         //wrap around to end of RxBuffer
@@ -315,14 +312,14 @@ int rtl8139_receive() {
       //3:for dword alignment
       nic.regs->CurAddrPacket &= rx_read_ptr_offset - 0x10;
     }
-    else{
+    else {
       rtl8139_set_rx_mode();
       break;
     }
 
     tmpCmd = nic.regs->Cmd;
 
-  }while (!(tmpCmd & RxBufEmpty));
+  } while ((tmpCmd & RxBufEmpty));
 
   return 1;
 }
