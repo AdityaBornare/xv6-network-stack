@@ -17,9 +17,9 @@
 #define ETIMEDOUT -1  		         //connection timed out
 
 #define RX_BUF_LEN (8192 << RX_BUF_LEN_IDX)
-#define RX_MAX_PKT_LENGTH 1024    // Correct this later
-#define RX_MIN_PKT_LENGTH 0       // Correct this later
-#define RX_READ_POINTER_MASK 0    // Correct this later
+#define RX_MAX_PKT_LENGTH 1514
+#define RX_MIN_PKT_LENGTH 60
+#define RX_READ_POINTER_MASK ~3
 
 #define RTL_REG_RXCONFIG_ACCEPTBROADCAST 0x08
 #define RTL_REG_RXCONFIG_ACCEPTMULTICAST 0x04
@@ -255,11 +255,8 @@ int rtl8139_packetOK() {
   int bad_packet = (rx_status & RUNT) || (rx_status & LongPkt) || (rx_status & CRC) || (rx_status & FAErr);
 
 	if(!bad_packet && (rx_status & ROK)) {
-    cprintf("pkt_size = %d\n", pkt_size);
-	  if(pkt_size > RX_MAX_PKT_LENGTH || rx_size < RX_MIN_PKT_LENGTH) {
-      cprintf("inside\n");
+	  if(pkt_size > RX_MAX_PKT_LENGTH || rx_size < RX_MIN_PKT_LENGTH)
 		  return 0;
-		}
 
 	  nic.packets_received_good++;
 	  nic.byte_received += pkt_size;
@@ -276,21 +273,16 @@ int rtl8139_receive() {
 	uint pkt_length;
 	uchar *p_income_pkt, *rx_read_ptr;
   uint rx_read_ptr_offset = nic.cur_rx % RX_BUF_LEN;
-
 	uint rx_status =  *((uint*)(nic.rx_ring + rx_read_ptr_offset));
   uint rx_size = rx_status >> 16;     // Includes CRC
-
   pkt_length = rx_size - 4;
-
-  for(int i = 0; i < RX_BUF_LEN; i++)
-    cprintf("%x ", nic.rx_ring[i]);
 
 	while(1){
 		tmpCmd = nic.regs->Cmd;
 		if(!(tmpCmd & RxBufEmpty))
 			break;
 	}
-
+  cprintf("rx_read_ptr_offset = %d\n", rx_read_ptr_offset);
 	do {
 	  rx_read_ptr = nic.rx_ring + rx_read_ptr_offset;
 		p_income_pkt = rx_read_ptr + 4;
@@ -298,18 +290,22 @@ int rtl8139_receive() {
 		if(rtl8139_packetOK()) {
       cprintf("packet OK\n");
 		  if ( (rx_read_ptr_offset + pkt_length) > RX_BUF_LEN ){
-        //wrap around to end of RxBuffer
+        // wrap around to end of RxBuffer
         memmove( nic.rx_ring + RX_BUF_LEN , nic.rx_ring,
         (rx_read_ptr_offset + pkt_length - RX_BUF_LEN));
       }
 
-      //copy the packet out here
+      // copy the packet out here
       memmove(p_income_pkt, p_income_pkt, pkt_length - 4);  //don't copy 4 bytes CRC
 
-      //update Read Pointer
-      rx_read_ptr_offset = (rx_read_ptr_offset + pkt_length + 4 + 3) & RX_READ_POINTER_MASK;
-      //4:for header length(PktLength include 4 bytes CRC)
-      //3:for dword alignment
+      // pass data to upper layer 
+      ether_receive((void*) p_income_pkt, pkt_length);
+
+      // update Read Pointer
+      rx_read_ptr_offset = (rx_read_ptr_offset + rx_size + 4 + 3) & RX_READ_POINTER_MASK;
+      // 4:for header length(PktLength include 4 bytes CRC)
+      // 3:for dword alignment 
+      nic.cur_rx = rx_read_ptr_offset;
       nic.regs->CurAddrPacket &= rx_read_ptr_offset - 0x10;
     }
     else {
@@ -345,7 +341,6 @@ void nicintr() {
   if (status & RxOK) {
     cprintf("Rx OK\n");
     rtl8139_receive();
-    cprintf("receive done\n");
     status &= RxOK;
     nic.regs->ISR = status;
   }

@@ -3,6 +3,7 @@
 #include "x86.h"
 #include "ether.h"
 
+// prepare and send ethernet frame
 void ether_send(unsigned char* destMAC, unsigned char* srcMAC, unsigned short type, unsigned char* playload, uint plen){
   if(plen > ETHERNET_PAYLOAD_SIZE_MAX) {
     cprintf("maximum playload size exceeded!\n");
@@ -36,4 +37,18 @@ void ether_send(unsigned char* destMAC, unsigned char* srcMAC, unsigned short ty
 
   // Send the Ethernet frame using rtl8139_send
   rtl8139_send((void*)&frame, flen);
+}
+
+// extract playload from ethernet frame, pkt_size = frame_size - 4  (exclude CRC)
+void ether_receive(void *eth_frame, int pkt_size) {
+  ether_hdr *header = (ether_hdr*) eth_frame;
+  char *playload = (char*) (header + 1);
+  char data[pkt_size + 1];
+  int i;
+
+  for(i = 0; i < pkt_size - ETHERNET_HDR_SIZE; i++)
+    data[i] = playload[i];
+  data[i] = 0;
+  
+  cprintf("data received: %s\n", data);;
 }
