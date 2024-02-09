@@ -20,7 +20,7 @@ void network_receive(void* ip_dgram, int dsize){
 
 };
 
-void network_send(unsigned char tos, unsigned char ttl, unsigned short id, unsigned char protocol, unsigned char* buffer, unsigned char* src_ip, unsigned char* dst_ip, int size){
+void network_send(uchar tos, uchar ttl, ushort id, uchar protocol, uchar* buffer, uchar* src_ip, uchar* dst_ip, int size){
   
   // Perform any necessary processing before sending
   // (e.g., updating IP headers, routing information)
