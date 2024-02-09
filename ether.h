@@ -9,7 +9,7 @@
 #define MAC_SIZE 6
 
 typedef struct {
-  unsigned char dst[MAC_SIZE];
-  unsigned char src[MAC_SIZE];
-  unsigned short type;
+  uchar dst[MAC_SIZE];
+  uchar src[MAC_SIZE];
+  ushort type;
 } ether_hdr;

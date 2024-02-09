@@ -23,7 +23,7 @@ void            consoleintr(int(*)(void));
 void            panic(char*) __attribute__((noreturn));
 
 // ether.c
-void            ether_send(unsigned char* destMAC, unsigned char* srcMAC, unsigned short type, unsigned char* payload, uint plen);
+void            ether_send(uchar* destMAC, uchar* srcMAC, ushort type, uchar* payload, uint plen);
 void            ether_receive(void *eth_frame, int pkt_size);
 
 // exec.c

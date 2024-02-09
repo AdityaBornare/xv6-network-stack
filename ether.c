@@ -4,7 +4,7 @@
 #include "ether.h"
 
 // prepare and send ethernet frame
-void ether_send(unsigned char* destMAC, unsigned char* srcMAC, unsigned short type, unsigned char* playload, uint plen){
+void ether_send(uchar* destMAC, uchar* srcMAC, ushort type, uchar* playload, uint plen){
   if(plen > ETHERNET_PAYLOAD_SIZE_MAX) {
     cprintf("maximum playload size exceeded!\n");
     return;
@@ -13,7 +13,7 @@ void ether_send(unsigned char* destMAC, unsigned char* srcMAC, unsigned short ty
   uint flen;
 
   cprintf("size of playload : %d\n", plen);
-  unsigned char frame[ETHERNET_FRAME_SIZE_MAX];
+  uchar frame[ETHERNET_FRAME_SIZE_MAX];
 
   header = (ether_hdr*)frame;
 
