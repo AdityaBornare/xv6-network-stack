@@ -12,6 +12,7 @@ OBJS = \
 	log.o\
 	main.o\
 	mp.o\
+  network.o\
 	pci.o\
 	picirq.o\
 	pipe.o\

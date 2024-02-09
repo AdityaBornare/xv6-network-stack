@@ -95,6 +95,11 @@ void            end_op();
 extern int      ismp;
 void            mpinit(void);
 
+//network.c
+void            network_init();
+void            network_receive(void* ip_dgram, int dsize);
+void            network_send(unsigned char tos, unsigned char ttl, unsigned short id, unsigned char protocol, unsigned char* buffer, unsigned char* src_ip, unsigned char* dst_ip, int size);
+
 // pci.c
 uint read_pci_config_register(uchar bus, uchar device, uchar function, uchar offset);
 void write_pci_config_register(uchar bus, uchar device, uchar function, uchar offset, uint data);
