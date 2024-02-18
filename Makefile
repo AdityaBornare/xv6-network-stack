@@ -1,6 +1,7 @@
 OBJS = \
 	bio.o\
 	console.o\
+	ether.o\
 	exec.o\
 	file.o\
 	fs.o\
@@ -12,11 +13,13 @@ OBJS = \
 	log.o\
 	main.o\
 	mp.o\
+	netutils.o\
   network.o\
 	pci.o\
 	picirq.o\
 	pipe.o\
 	proc.o\
+	rtl8139.o\
 	sleeplock.o\
 	spinlock.o\
 	string.o\
@@ -29,8 +32,6 @@ OBJS = \
 	uart.o\
 	vectors.o\
 	vm.o\
-  ether.o\
-	rtl8139.o\
 
 # Cross-compiling (e.g., on Mac OS X)
 # TOOLPREFIX = i386-jos-elf

@@ -29,7 +29,7 @@ void ether_send(uchar* destMAC, ushort type, void* playload, uint plen){
   memmove(header->src, MAC, MAC_SIZE);
 
   // Set the type
-  header->type = type;
+  header->type = htons(type);
 
   //Set the payload
   memmove(header + 1, playload, plen);

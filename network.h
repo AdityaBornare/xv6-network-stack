@@ -21,7 +21,7 @@ typedef struct ip_header {
   ushort checksum;                // Header checksum
   uchar src_ip[IP_ADDR_SIZE];     // Source IP address
   uchar dst_ip[IP_ADDR_SIZE];     // Destination IP address
-}ip_header;
+} ip_header;
 
 typedef struct ip_packet {
     ip_header ip_hdr;

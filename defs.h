@@ -96,14 +96,18 @@ void            end_op();
 extern int      ismp;
 void            mpinit(void);
 
-//network.c
+// netutils.c
+ushort          htons(ushort n);
+uint            htonl(uint n);
+
+// network.c
 void            network_init();
 void            network_receive(void* ip_dgram, int dsize);
 void            network_send(uchar protocol, void* buffer, uchar* src_ip, uchar* dst_ip, int size);
 
 // pci.c
-uint read_pci_config_register(uchar bus, uchar device, uchar function, uchar offset);
-void write_pci_config_register(uchar bus, uchar device, uchar function, uchar offset, uint data);
+uint            read_pci_config_register(uchar bus, uchar device, uchar function, uchar offset);
+void            write_pci_config_register(uchar bus, uchar device, uchar function, uchar offset, uint data);
 
 // picirq.c
 void            picenable(int);
