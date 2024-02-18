@@ -1,5 +1,8 @@
 #define MAX_TRANSPORT_PAYLOAD_SIZE 1480 //considering Maximum Transmission Unit (MTU) of ethernet is 1500 bytes
 #define IP_ADDR_SIZE 4
+#define MINIMUM_IHL 5
+#define HDR_SIZE 20
+#define INITIAL_TTL 64
 
 /*note- ip header structure is according to rfc791-INTERNET PROTOCOL
   Not included the options field in header as it is needed for advanced or specialized networking feature
@@ -12,7 +15,7 @@ typedef struct ip_header {
   uchar tos;                      // Type of Service
   ushort tlen;                    // Total length of the IP packet (header + data)
   ushort id;                      // Identification for fragmented packets
-  ushort offset;                  // Flags (3 bits) and Fragment Offset (13 bits)
+  ushort flags_offset;            // Flags (3 bits) and Fragment Offset (13 bits)
   uchar ttl;                      // Time to live (TTL)
   uchar protocol;                 // Protocol used in the next layer (TCP/UDP)
   ushort checksum;                // Header checksum

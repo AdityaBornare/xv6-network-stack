@@ -3,8 +3,11 @@
 #include "x86.h"
 #include "ether.h"
 
+// mac address - initialized in nicinit
+char MAC[MAC_SIZE];
+
 // prepare and send ethernet frame
-void ether_send(uchar* destMAC, uchar* srcMAC, ushort type, uchar* playload, uint plen){
+void ether_send(uchar* destMAC, ushort type, void* playload, uint plen){
   if(plen > ETHERNET_PAYLOAD_SIZE_MAX) {
     cprintf("maximum playload size exceeded!\n");
     return;
@@ -23,7 +26,7 @@ void ether_send(uchar* destMAC, uchar* srcMAC, ushort type, uchar* playload, uin
 
   // Set source MAC address
   // 52:54:98:76:54:32
-  memmove(header->src, srcMAC, MAC_SIZE);
+  memmove(header->src, MAC, MAC_SIZE);
 
   // Set the type
   header->type = type;

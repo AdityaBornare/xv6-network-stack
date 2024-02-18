@@ -2,11 +2,13 @@
 #include "defs.h"
 #include "network.h"
 
+ushort id = 0;
+
 void network_init(){
 
   // Initialize network layer, setup routing tables, etc.
 
-};
+}
 
 void network_receive(void* ip_dgram, int dsize){
   
@@ -18,16 +20,29 @@ void network_receive(void* ip_dgram, int dsize){
   // Pass the transport payload to the transport layer (UDP/TCP)
   // The transport layer will handle the headers internally
 
-};
+}
 
-void network_send(uchar tos, uchar ttl, ushort id, uchar protocol, uchar* buffer, uchar* src_ip, uchar* dst_ip, int size){
+void network_send(uchar protocol, void* buffer, uchar *src_ip, uchar *dst_ip, int size){
+  ip_packet pkt;
+  pkt.ip_hdr.version_ihl = (4 << 4) | MINIMUM_IHL;
+  pkt.ip_hdr.tos = 0;
+  pkt.ip_hdr.tlen = HDR_SIZE + size;
+  pkt.ip_hdr.id = id++;
+  pkt.ip_hdr.flags_offset = 0x4000;
+  pkt.ip_hdr.ttl = INITIAL_TTL;
+  pkt.ip_hdr.protocol = protocol;
+  memmove(pkt.ip_hdr.src_ip, src_ip, IP_ADDR_SIZE);
+  memmove(pkt.ip_hdr.dst_ip, dst_ip, IP_ADDR_SIZE);
+  pkt.ip_hdr.checksum = 0;
+
+  ushort *p = (ushort*) &pkt.ip_hdr;
+  ushort sum = 0;
+  for(int i = 0; i < HDR_SIZE / 2; i++) 
+    sum += p[i];
+  pkt.ip_hdr.checksum = ~sum;
+
+  memmove(pkt.transport_payload, buffer, size);
   
-  // Perform any necessary processing before sending
-  // (e.g., updating IP headers, routing information)
-
-  // Encapsulate the packet in an Ethernet frame
-  // Copy the network layer packet into the frame payload
-  // Pass the frame to the data link layer for transmission
-
-};
-
+  uchar destMAC[] = {0x12, 0x12, 0x12, 0x12, 0x12, 0x12};
+  ether_send(destMAC, 0x0008, &pkt, HDR_SIZE + size);
+}

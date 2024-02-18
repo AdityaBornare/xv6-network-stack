@@ -23,7 +23,8 @@ void            consoleintr(int(*)(void));
 void            panic(char*) __attribute__((noreturn));
 
 // ether.c
-void            ether_send(uchar* destMAC, uchar* srcMAC, ushort type, uchar* payload, uint plen);
+extern char MAC[];
+void            ether_send(uchar* destMAC, ushort type, void* payload, uint plen);
 void            ether_receive(void *eth_frame, int pkt_size);
 
 // exec.c
@@ -98,7 +99,7 @@ void            mpinit(void);
 //network.c
 void            network_init();
 void            network_receive(void* ip_dgram, int dsize);
-void            network_send(uchar tos, uchar ttl, ushort id, uchar protocol, uchar* buffer, uchar* src_ip, uchar* dst_ip, int size);
+void            network_send(uchar protocol, void* buffer, uchar* src_ip, uchar* dst_ip, int size);
 
 // pci.c
 uint read_pci_config_register(uchar bus, uchar device, uchar function, uchar offset);
