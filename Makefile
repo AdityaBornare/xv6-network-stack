@@ -228,9 +228,9 @@ endif
 
 # QEMUOPTS = -drive file=fs.img,index=1,media=disk,format=raw -drive file=xv6.img,index=0,media=disk,format=raw -smp $(CPUS) -m 512 -nic socket,id=n1,model=rtl8139,mac=52:54:98:76:54:32,listen=:1234 -object filter-dump,id=f1,netdev=n1,file=dump.dat $(QEMUEXTRA)
 
-QEMUOPTS = -drive file=fs.img,index=1,media=disk,format=raw -drive file=xv6.img,index=0,media=disk,format=raw -smp $(CPUS) -m 512 -nic tap,id=n1,model=rtl8139,mac=52:54:98:76:54:32,script=./qemu-ifup -object filter-dump,id=f1,netdev=n1,file=dump.dat $(QEMUEXTRA)
+QEMUOPTS = -drive file=fs.img,index=1,media=disk,format=raw -drive file=xv6.img,index=0,media=disk,format=raw -smp $(CPUS) -m 512 -nic bridge,br=br0,id=n1,model=rtl8139,mac=52:54:98:76:54:32 -object filter-dump,id=f1,netdev=n1,file=dump.dat $(QEMUEXTRA)
 
-QEMUOPTS2 = -drive file=fs.img,index=1,media=disk,format=raw -drive file=xv6.img,index=0,media=disk,format=raw -smp $(CPUS) -m 512 -nic user,id=n1,model=rtl8139,mac=52:54:98:76:54:33 -object filter-dump,id=f1,netdev=n1,file=dump.dat $(QEMUEXTRA)
+QEMUOPTS2 = -drive file=fs.img,index=1,media=disk,format=raw -drive file=xv6.img,index=0,media=disk,format=raw -smp $(CPUS) -m 512 -nic bridge,br=br0,id=n1,model=rtl8139,mac=52:54:98:76:54:33 -object filter-dump,id=f1,netdev=n1,file=dump.dat $(QEMUEXTRA)
 
 qemu: fs.img xv6.img
 	$(QEMU) -serial mon:stdio $(QEMUOPTS)

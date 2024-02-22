@@ -26,8 +26,6 @@ void network_send(uchar protocol, void* buffer, uchar *src_ip, uchar *dst_ip, in
   ip_packet pkt;
   pkt.ip_hdr.version_ihl = (4 << 4) | MINIMUM_IHL;
   pkt.ip_hdr.tos = 0;
-  cprintf("hdr len = %d, size = %d\n", HDR_SIZE, size);
-  cprintf("htons = %d\n", HDR_SIZE + size);
   pkt.ip_hdr.tlen = htons(HDR_SIZE + size);
   pkt.ip_hdr.id = htons(id++);
   pkt.ip_hdr.flags_offset = htons(0x4000);
@@ -45,6 +43,6 @@ void network_send(uchar protocol, void* buffer, uchar *src_ip, uchar *dst_ip, in
 
   memmove(pkt.transport_payload, buffer, size);
   
-  uchar destMAC[] = {0x12, 0x12, 0x12, 0x12, 0x12, 0x12};
+  uchar destMAC[] = {0x52, 0x54, 0x98, 0x76, 0x54, 0x33};
   ether_send(destMAC, 0x0800, &pkt, HDR_SIZE + size);
 }
