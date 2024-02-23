@@ -22,7 +22,7 @@ void network_receive(void* ip_dgram, int dsize){
 
 }
 
-void network_send(uchar protocol, void* buffer, uchar *src_ip, uchar *dst_ip, int size){
+void network_send(uchar protocol, void* buffer, uint src_ip, uint dst_ip, int size) {
   ip_packet pkt;
   pkt.ip_hdr.version_ihl = (4 << 4) | MINIMUM_IHL;
   pkt.ip_hdr.tos = 0;
@@ -31,8 +31,8 @@ void network_send(uchar protocol, void* buffer, uchar *src_ip, uchar *dst_ip, in
   pkt.ip_hdr.flags_offset = htons(0x4000);
   pkt.ip_hdr.ttl = INITIAL_TTL;
   pkt.ip_hdr.protocol = protocol;
-  memmove(pkt.ip_hdr.src_ip, src_ip, IP_ADDR_SIZE);
-  memmove(pkt.ip_hdr.dst_ip, dst_ip, IP_ADDR_SIZE);
+  pkt.ip_hdr.src_ip = htonl(src_ip);
+  pkt.ip_hdr.dst_ip = htonl(dst_ip);
   pkt.ip_hdr.checksum = 0;
 
   ushort *p = (ushort*) &pkt.ip_hdr;
@@ -42,7 +42,13 @@ void network_send(uchar protocol, void* buffer, uchar *src_ip, uchar *dst_ip, in
   pkt.ip_hdr.checksum = htons(~sum);
 
   memmove(pkt.transport_payload, buffer, size);
-  
-  uchar destMAC[] = {0x52, 0x54, 0x98, 0x76, 0x54, 0x33};
-  ether_send(destMAC, 0x0800, &pkt, HDR_SIZE + size);
+
+  if (dst_ip == 0xffffffff) {
+    uchar destMAC[] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
+    ether_send(destMAC, 0x0800, &pkt, HDR_SIZE + size);
+  }
+  else {  
+    uchar destMAC[] = {0x52, 0x54, 0x98, 0x76, 0x54, 0x33};
+    ether_send(destMAC, 0x0800, &pkt, HDR_SIZE + size);
+  }
 }

@@ -22,6 +22,9 @@ void            cprintf(char*, ...);
 void            consoleintr(int(*)(void));
 void            panic(char*) __attribute__((noreturn));
 
+// dhcp.c
+void dhcp_discover();
+
 // ether.c
 extern char MAC[];
 void            ether_send(uchar* destMAC, ushort type, void* payload, uint plen);
@@ -99,11 +102,12 @@ void            mpinit(void);
 // netutils.c
 ushort          htons(ushort n);
 uint            htonl(uint n);
+uint            inet_addr(char ip_str[]);
 
 // network.c
 void            network_init();
 void            network_receive(void* ip_dgram, int dsize);
-void            network_send(uchar protocol, void* buffer, uchar* src_ip, uchar* dst_ip, int size);
+void            network_send(uchar protocol, void* buffer, uint src_ip, uint dst_ip, int size);
 
 // pci.c
 uint            read_pci_config_register(uchar bus, uchar device, uchar function, uchar offset);

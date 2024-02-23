@@ -1,6 +1,7 @@
 OBJS = \
 	bio.o\
 	console.o\
+	dhcp.o\
 	ether.o\
 	exec.o\
 	file.o\

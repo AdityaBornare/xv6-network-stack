@@ -107,9 +107,12 @@ sys_test(void)
   // Send the Ethernet packet
   ether_send(destMAC, srcMAC, type, payload, plen);
   */
+  /*
   uchar playload[] = "test";
-  uchar src_ip[] = {192, 168, 2, 1};
-  uchar dst_ip[] = {192, 168, 1, 1};
+  uint src_ip = inet_addr("192.168.196.1");
+  uint dst_ip = inet_addr("192.168.196.2");
   network_send(6, playload, src_ip, dst_ip, sizeof(playload));
+  */
+  dhcp_discover();
   return 0;
 }

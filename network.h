@@ -19,8 +19,8 @@ typedef struct ip_header {
   uchar ttl;                      // Time to live (TTL)
   uchar protocol;                 // Protocol used in the next layer (TCP/UDP)
   ushort checksum;                // Header checksum
-  uchar src_ip[IP_ADDR_SIZE];     // Source IP address
-  uchar dst_ip[IP_ADDR_SIZE];     // Destination IP address
+  uint src_ip;                    // Source IP address
+  uint dst_ip;                    // Destination IP address
 } ip_header;
 
 typedef struct ip_packet {
