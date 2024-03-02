@@ -13,11 +13,31 @@ void network_init(){
 void network_receive(void* ip_dgram, int dsize){
   
   // Extract the network layer packet from the Ethernet frame
+  ip_header* received_ip_hdr = (ip_header*)ip_dgram;
 
   // Process the received packet
-  // Perform routing, packet validation, and other network layer tasks
+  // validate checksum
+  ushort *p = (ushort*) &received_ip_hdr;
+  ushort sum = 0;
 
+  for(int i = 0; i < HDR_SIZE / 2; i++) 
+    sum += p[i];
+
+  if ((sum & 0xFFFF) != 0xFFFF) {
+    cprintf("Invalid checksum.");
+    return;
+  }
+  // Perform routing, packet validation, and other network layer tasks
+  if(received_ip_hdr->protocol == PROTOCOL_UDP){
+    //perform UDP checks 
+  }
+  else if(received_ip_hdr->protocol == PROTOCOL_TCP){
+    //perform TCP checks
+  }
+  
   // Pass the transport payload to the transport layer (UDP/TCP)
+  void* transport_payload = (void*)((uchar*)ip_dgram + (received_ip_hdr->version_ihl & 0x0F) * 4);
+
   // The transport layer will handle the headers internally
 
 }
