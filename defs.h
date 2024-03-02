@@ -10,6 +10,9 @@ struct sleeplock;
 struct stat;
 struct superblock;
 
+// arp.c
+char *arp_resolve(uint ip);
+
 // bio.c
 void            binit(void);
 struct buf*     bread(uint, uint);
@@ -105,6 +108,7 @@ uint            htonl(uint n);
 uint            inet_addr(char ip_str[]);
 
 // network.c
+extern uint MY_IP;
 void            network_init();
 void            network_receive(void* ip_dgram, int dsize);
 void            network_send(uchar protocol, void* buffer, uint src_ip, uint dst_ip, int size);

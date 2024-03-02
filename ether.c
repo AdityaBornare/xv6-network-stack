@@ -7,15 +7,15 @@
 char MAC[MAC_SIZE];
 
 // prepare and send ethernet frame
-void ether_send(uchar* destMAC, ushort type, void* playload, uint plen){
+void ether_send(uchar* destMAC, ushort type, void* payload, uint plen){
   if(plen > ETHERNET_PAYLOAD_SIZE_MAX) {
-    cprintf("maximum playload size exceeded!\n");
+    cprintf("maximum payload size exceeded!\n");
     return;
   }
   ether_hdr *header;
   uint flen;
 
-  cprintf("size of playload : %d\n", plen);
+  cprintf("size of payload : %d\n", plen);
   uchar frame[ETHERNET_FRAME_SIZE_MAX];
 
   header = (ether_hdr*)frame;
@@ -32,7 +32,7 @@ void ether_send(uchar* destMAC, ushort type, void* playload, uint plen){
   header->type = htons(type);
 
   //Set the payload
-  memmove(header + 1, playload, plen);
+  memmove(header + 1, payload, plen);
 
   flen = ETHERNET_HDR_SIZE + plen;
 
@@ -45,13 +45,13 @@ void ether_send(uchar* destMAC, ushort type, void* playload, uint plen){
 // extract playload from ethernet frame, pkt_size = frame_size - 4  (exclude CRC)
 void ether_receive(void *eth_frame, int pkt_size) {
   ether_hdr *header = (ether_hdr*) eth_frame;
-  char *playload = (char*) (header + 1);
-  char data[pkt_size + 1];
-  int i;
-
+  char *payload = (char*) (header + 1);
+  // char data[pkt_size + 1];
+  // int i;
+  /*
   for(i = 0; i < pkt_size - ETHERNET_HDR_SIZE; i++)
-    data[i] = playload[i];
+    data[i] = payload[i];
   data[i] = 0;
-  
-  cprintf("data received: %s\n", data);;
+  */
+  network_receive(payload, pkt_size - ETHERNET_HDR_SIZE);
 }

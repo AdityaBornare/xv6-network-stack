@@ -1,13 +1,23 @@
-typedef struct arp_header {
+#define ARP_HTYPE_ETHERNET 1
+#define ARP_OP_REQUEST 1
+#define ARP_OP_REPLY 2
+#define HADDR_SIZE 6
+
+struct arp_packet {
     ushort hwd_type;
-    ushort protocol;
-    ushort hwd_length;
-    ushort pro_length;
-    ushort op_req;
-} arp_header;
+    ushort prot_type;
+    uchar hwd_length;
+    uchar prot_length;
+    ushort op;
+    uchar sender_haddr[HADDR_SIZE];
+    uint sender_paddr;
+    uchar target_haddr[HADDR_SIZE];
+    uint target_paddr;
+} __attribute__ ((packed));
+
+typedef struct arp_packet arp_packet;
 
 typedef struct arp_entry {
-    arp_header arp_header; 
-    ip_header ip_address;   
+    uint ip_address;  
     unsigned char mac_address[6]; 
 } arp_entry;

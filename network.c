@@ -3,6 +3,7 @@
 #include "network.h"
 
 ushort id = 0;
+uint MY_IP = 0xc0a80202;
 
 void network_init(){
 
@@ -13,17 +14,16 @@ void network_init(){
 void network_receive(void* ip_dgram, int dsize){
   
   // Extract the network layer packet from the Ethernet frame
-  ip_header* received_ip_hdr = (ip_header*)ip_dgram;
-
-  // Process the received packet
+  ip_header* received_ip_hdr = (ip_header*)ip_dgram; 
+  
   // validate checksum
-  ushort *p = (ushort*) &received_ip_hdr;
+  ushort *p = (ushort*) received_ip_hdr;
   ushort sum = 0;
 
-  for(int i = 0; i < HDR_SIZE / 2; i++) 
+  for(int i = 0; i < HDR_SIZE / 2; i++)
     sum += p[i];
 
-  if ((sum & 0xFFFF) != 0xFFFF) {
+  if (sum != 0xffff) {
     cprintf("Invalid checksum.");
     return;
   }
@@ -36,7 +36,7 @@ void network_receive(void* ip_dgram, int dsize){
   }
   
   // Pass the transport payload to the transport layer (UDP/TCP)
-  void* transport_payload = (void*)((uchar*)ip_dgram + (received_ip_hdr->version_ihl & 0x0F) * 4);
+  // void* transport_payload = (void*)((uchar*)ip_dgram + (received_ip_hdr->version_ihl & 0x0F) * 4);
 
   // The transport layer will handle the headers internally
 
@@ -57,12 +57,15 @@ void network_send(uchar protocol, void* buffer, uint src_ip, uint dst_ip, int si
 
   ushort *p = (ushort*) &pkt.ip_hdr;
   ushort sum = 0;
-  for(int i = 0; i < HDR_SIZE / 2; i++) 
+  for(int i = 0; i < HDR_SIZE / 2; i++)
     sum += p[i];
-  pkt.ip_hdr.checksum = htons(~sum);
+  pkt.ip_hdr.checksum = ~sum;
 
   memmove(pkt.transport_payload, buffer, size);
+  
+  arp_resolve(dst_ip);
 
+  /*
   if (dst_ip == 0xffffffff) {
     uchar destMAC[] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
     ether_send(destMAC, 0x0800, &pkt, HDR_SIZE + size);
@@ -71,4 +74,5 @@ void network_send(uchar protocol, void* buffer, uint src_ip, uint dst_ip, int si
     uchar destMAC[] = {0x52, 0x54, 0x98, 0x76, 0x54, 0x33};
     ether_send(destMAC, 0x0800, &pkt, HDR_SIZE + size);
   }
+  */
 }

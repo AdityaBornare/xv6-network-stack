@@ -135,7 +135,7 @@ struct RxStats{
 struct RxStats RxStats;
 
 void rtl8139_set_rx_mode() {
-  uint rx_mode = RTL_REG_RXCONFIG_ACCEPTBROADCAST | RTL_REG_RXCONFIG_ACCEPTMYPHYS | RTL_REG_RXCONFIG_ACCEPTMULTICAST;
+  uint rx_mode = RTL_REG_RXCONFIG_ACCEPTBROADCAST | RTL_REG_RXCONFIG_ACCEPTMYPHYS;
   nic.regs->RxConfig = rx_config | rx_mode;
   *((uint*)&nic.regs->MAR0) = 0xffffffff;
   *((uint*)&nic.regs->MAR4) = 0xffffffff;
