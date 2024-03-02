@@ -109,8 +109,8 @@ sys_test(void)
   */
   /*
   uchar playload[] = "test";
-  uint src_ip = inet_addr("192.168.196.1");
-  uint dst_ip = inet_addr("192.168.196.2");
+  uint src_ip = inet_addr("192.168.2.2");
+  uint dst_ip = inet_addr("192.168.1.1");
   network_send(6, playload, src_ip, dst_ip, sizeof(playload));
   */
   dhcp_discover();
