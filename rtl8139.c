@@ -9,7 +9,7 @@
 #define RX_DMA_BURST 4             // Calculate as 16 << 4 = 256 bytes
 #define TX_DMA_BURST 4             // Calculate as 16 << 4 = 256 bytes
 #define NUM_TX_DESC	4              // Number of Tx descriptor registers
-#define ETH_FRAME_LEN	1514	       // Max. octets in frame sans FCS
+#define ETH_FRAME_LEN	1514	       // Max. octets in frame sans FCS 
 #define TX_BUF_SIZE	ETH_FRAME_LEN
 #define ETH_ZLEN	60	             // Min. octets in frame sans FCS
 #define RX_BUF_LEN_IDX 0           // 0, 1, 2 is allowed - 8k ,16k ,32K rx buffer
@@ -135,7 +135,7 @@ struct RxStats{
 struct RxStats RxStats;
 
 void rtl8139_set_rx_mode() {
-  uint rx_mode = RTL_REG_RXCONFIG_ACCEPTBROADCAST | RTL_REG_RXCONFIG_ACCEPTMULTICAST | RTL_REG_RXCONFIG_ACCEPTMYPHYS;
+  uint rx_mode = RTL_REG_RXCONFIG_ACCEPTBROADCAST | RTL_REG_RXCONFIG_ACCEPTMYPHYS | RTL_REG_RXCONFIG_ACCEPTMULTICAST;
   nic.regs->RxConfig = rx_config | rx_mode;
   *((uint*)&nic.regs->MAR0) = 0xffffffff;
   *((uint*)&nic.regs->MAR4) = 0xffffffff;
@@ -199,10 +199,18 @@ void nicinit() {
 
   // Set base address for memory mapped io
   nic.regs = (volatile struct RTL8139_registers*) read_pci_config_register(0, i, 0, 0x14);
+  
+  // MAC address
+  MAC[0] = nic.regs->IDR0;
+  MAC[1] = nic.regs->IDR1;
+  MAC[2] = nic.regs->IDR2;
+  MAC[3] = nic.regs->IDR3;
+  MAC[4] = nic.regs->IDR4;
+  MAC[5] = nic.regs->IDR5;
 
   // Configure interrupt line
-  ioapicenable(9, 0);
-  ioapicenable(11, 0);
+  ioapicenable(IRQ_CASCADE, 0);
+  ioapicenable(IRQ_NIC, 0);
 
   // Set the LWAKE + LWPTN to active high. This should essentially 'power on' the device.
   nic.regs->Config1 = 0x0;
@@ -322,7 +330,6 @@ int rtl8139_receive() {
 
 void nicintr() {
   volatile uint status = nic.regs->ISR;
-  cprintf("CMD = %x\n", nic.regs->Cmd);
 
   if (status & TxOK) {
     cprintf("Tx OK\n");

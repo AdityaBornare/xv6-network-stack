@@ -93,7 +93,7 @@ sys_uptime(void)
 int
 sys_test(void)
 {
-  unsigned char destMAC[] = {0x52, 0x54, 0x98, 0x76, 0x54, 0x32};
+  /* unsigned char destMAC[] = {0x52, 0x54, 0x98, 0x76, 0x54, 0x32};
 
   unsigned char srcMAC[] = {0x52, 0x54, 0x98, 0x76, 0x54, 0x33};
 
@@ -106,6 +106,13 @@ sys_test(void)
 
   // Send the Ethernet packet
   ether_send(destMAC, srcMAC, type, payload, plen);
-
+  */
+  /*
+  uchar playload[] = "test";
+  uint src_ip = inet_addr("192.168.2.2");
+  uint dst_ip = inet_addr("192.168.1.1");
+  network_send(6, playload, src_ip, dst_ip, sizeof(playload));
+  */
+  dhcp_discover();
   return 0;
 }
