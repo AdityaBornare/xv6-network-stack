@@ -18,7 +18,7 @@ struct arp_packet {
 typedef struct arp_packet arp_packet;
 
 typedef struct arp_entry {
-  uint ip;  
+  uint ip;
   uchar mac[HADDR_SIZE];
   uint valid_until;
   uint is_valid;

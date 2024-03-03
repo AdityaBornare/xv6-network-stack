@@ -1,4 +1,4 @@
-#!/bin/bash  
+#!/bin/bash
 
 ip link add name $1 type bridge
 ip addr add $2 dev $1

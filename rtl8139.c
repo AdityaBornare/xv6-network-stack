@@ -9,7 +9,7 @@
 #define RX_DMA_BURST 4             // Calculate as 16 << 4 = 256 bytes
 #define TX_DMA_BURST 4             // Calculate as 16 << 4 = 256 bytes
 #define NUM_TX_DESC	4              // Number of Tx descriptor registers
-#define ETH_FRAME_LEN	1514	       // Max. octets in frame sans FCS 
+#define ETH_FRAME_LEN	1514	       // Max. octets in frame sans FCS
 #define TX_BUF_SIZE	ETH_FRAME_LEN
 #define ETH_ZLEN	60	             // Min. octets in frame sans FCS
 #define RX_BUF_LEN_IDX 0           // 0, 1, 2 is allowed - 8k ,16k ,32K rx buffer
@@ -199,7 +199,7 @@ void nicinit() {
 
   // Set base address for memory mapped io
   nic.regs = (volatile struct RTL8139_registers*) read_pci_config_register(0, i, 0, 0x14);
-  
+
   // MAC address
   MAC[0] = nic.regs->IDR0;
   MAC[1] = nic.regs->IDR1;

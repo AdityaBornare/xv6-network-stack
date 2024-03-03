@@ -12,10 +12,9 @@ void ip_init(){
 }
 
 void ip_receive(void* ip_dgram, int dsize){
-  
   // Extract the network layer packet from the Ethernet frame
-  ip_header* rx_ip_hdr = (ip_header*)ip_dgram; 
-  
+  ip_header* rx_ip_hdr = (ip_header*)ip_dgram;
+
   // validate checksum
   rx_ip_hdr->checksum = htons(rx_ip_hdr->checksum);
   ushort *p = (ushort*) rx_ip_hdr;
@@ -28,19 +27,11 @@ void ip_receive(void* ip_dgram, int dsize){
     cprintf("Invalid checksum.");
     return;
   }
-  // Perform routing, packet validation, and other network layer tasks
-  if(rx_ip_hdr->protocol == PROTOCOL_UDP){
-    //perform UDP checks 
-  }
-  else if(rx_ip_hdr->protocol == PROTOCOL_TCP){
-    //perform TCP checks
-  }
-  
+
   // Pass the transport payload to the transport layer (UDP/TCP)
   // void* transport_payload = (void*)((uchar*)ip_dgram + (received_ip_hdr->version_ihl & 0x0F) * 4);
 
   // The transport layer will handle the headers internally
-
 }
 
 void ip_send(uchar protocol, void* buffer, uint src_ip, uint dst_ip, int size) {
@@ -63,7 +54,7 @@ void ip_send(uchar protocol, void* buffer, uint src_ip, uint dst_ip, int size) {
   pkt.ip_hdr.checksum = htons(~sum);
 
   memmove(pkt.transport_payload, buffer, size);
-  
+
   uchar *mac = arp_resolve(dst_ip);
   for(int i = 0; i < 6; i++) {
     cprintf("%x ", mac[i]);
@@ -74,7 +65,7 @@ void ip_send(uchar protocol, void* buffer, uint src_ip, uint dst_ip, int size) {
     uchar destMAC[] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
     ether_send(destMAC, 0x0800, &pkt, HDR_SIZE + size);
   }
-  else {  
+  else {
     uchar destMAC[] = {0x52, 0x54, 0x98, 0x76, 0x54, 0x33};
     ether_send(destMAC, 0x0800, &pkt, HDR_SIZE + size);
   }
