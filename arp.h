@@ -4,20 +4,22 @@
 #define HADDR_SIZE 6
 
 struct arp_packet {
-    ushort hwd_type;
-    ushort prot_type;
-    uchar hwd_length;
-    uchar prot_length;
-    ushort op;
-    uchar sender_haddr[HADDR_SIZE];
-    uint sender_paddr;
-    uchar target_haddr[HADDR_SIZE];
-    uint target_paddr;
+  ushort hwd_type;
+  ushort prot_type;
+  uchar hwd_length;
+  uchar prot_length;
+  ushort op;
+  uchar sender_haddr[HADDR_SIZE];
+  uint sender_paddr;
+  uchar target_haddr[HADDR_SIZE];
+  uint target_paddr;
 } __attribute__ ((packed));
 
 typedef struct arp_packet arp_packet;
 
 typedef struct arp_entry {
-    uint ip_address;  
-    unsigned char mac_address[6]; 
+  uint ip;  
+  uchar mac[HADDR_SIZE];
+  uint valid_until;
+  uint is_valid;
 } arp_entry;

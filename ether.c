@@ -46,6 +46,7 @@ void ether_send(uchar* destMAC, ushort type, void* payload, uint plen){
 void ether_receive(void *eth_frame, int pkt_size) {
   ether_hdr *header = (ether_hdr*) eth_frame;
   char *payload = (char*) (header + 1);
+  ushort type = htons(header->type); 
   // char data[pkt_size + 1];
   // int i;
   /*
@@ -53,5 +54,11 @@ void ether_receive(void *eth_frame, int pkt_size) {
     data[i] = payload[i];
   data[i] = 0;
   */
-  ip_receive(payload, pkt_size - ETHERNET_HDR_SIZE);
+  cprintf("%x\n", type);
+  if(type == ETHERNET_TYPE_IP)
+    ip_receive(payload, pkt_size - ETHERNET_HDR_SIZE);
+  else if(type == ETHERNET_TYPE_ARP)
+    arp_receive(payload);
+  else
+    return;
 }

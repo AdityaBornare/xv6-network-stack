@@ -11,7 +11,8 @@ struct stat;
 struct superblock;
 
 // arp.c
-char *arp_resolve(uint ip);
+uchar           *arp_resolve(uint ip);
+void            arp_receive(void *arp_pkt);
 
 // bio.c
 void            binit(void);
@@ -200,6 +201,9 @@ extern struct spinlock tickslock;
 void            uartinit(void);
 void            uartintr(void);
 void            uartputc(int);
+
+// utils.c
+void            delay(int milliseconds);
 
 // vm.c
 void            seginit(void);
