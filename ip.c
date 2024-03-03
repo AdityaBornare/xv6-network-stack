@@ -1,17 +1,17 @@
 #include "types.h"
 #include "defs.h"
-#include "network.h"
+#include "ip.h"
 
 ushort id = 0;
 uint MY_IP = 0xc0a80202;
 
-void network_init(){
+void ip_init(){
 
   // Initialize network layer, setup routing tables, etc.
 
 }
 
-void network_receive(void* ip_dgram, int dsize){
+void ip_receive(void* ip_dgram, int dsize){
   
   // Extract the network layer packet from the Ethernet frame
   ip_header* received_ip_hdr = (ip_header*)ip_dgram; 
@@ -42,7 +42,7 @@ void network_receive(void* ip_dgram, int dsize){
 
 }
 
-void network_send(uchar protocol, void* buffer, uint src_ip, uint dst_ip, int size) {
+void ip_send(uchar protocol, void* buffer, uint src_ip, uint dst_ip, int size) {
   ip_packet pkt;
   pkt.ip_hdr.version_ihl = (4 << 4) | MINIMUM_IHL;
   pkt.ip_hdr.tos = 0;

@@ -2,13 +2,13 @@ OBJS = \
 	arp.o\
 	bio.o\
 	console.o\
-	dhcp.o\
 	ether.o\
 	exec.o\
 	file.o\
 	fs.o\
 	ide.o\
 	ioapic.o\
+	ip.o\
 	kalloc.o\
 	kbd.o\
 	lapic.o\
@@ -16,7 +16,6 @@ OBJS = \
 	main.o\
 	mp.o\
 	netutils.o\
-  network.o\
 	pci.o\
 	picirq.o\
 	pipe.o\

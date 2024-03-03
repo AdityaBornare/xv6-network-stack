@@ -74,6 +74,12 @@ void            ioapicenable(int irq, int cpunum);
 extern uchar    ioapicid;
 void            ioapicinit(void);
 
+// ip.c
+extern uint     MY_IP;
+void            ip_init();
+void            ip_receive(void* ip_dgram, int dsize);
+void            ip_send(uchar protocol, void* buffer, uint src_ip, uint dst_ip, int size);
+
 // kalloc.c
 char*           kalloc(void);
 void            kfree(char*);
@@ -106,12 +112,6 @@ void            mpinit(void);
 ushort          htons(ushort n);
 uint            htonl(uint n);
 uint            inet_addr(char ip_str[]);
-
-// network.c
-extern uint MY_IP;
-void            network_init();
-void            network_receive(void* ip_dgram, int dsize);
-void            network_send(uchar protocol, void* buffer, uint src_ip, uint dst_ip, int size);
 
 // pci.c
 uint            read_pci_config_register(uchar bus, uchar device, uchar function, uchar offset);

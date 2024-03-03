@@ -53,5 +53,5 @@ void ether_receive(void *eth_frame, int pkt_size) {
     data[i] = payload[i];
   data[i] = 0;
   */
-  network_receive(payload, pkt_size - ETHERNET_HDR_SIZE);
+  ip_receive(payload, pkt_size - ETHERNET_HDR_SIZE);
 }

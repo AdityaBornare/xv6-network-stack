@@ -2,7 +2,7 @@
 #include "defs.h"
 #include "arp.h"
 #include "ether.h"
-#include "network.h"
+#include "ip.h"
 
 char *arp_resolve(uint ip) {
   arp_packet ap;
