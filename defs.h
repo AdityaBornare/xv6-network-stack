@@ -77,6 +77,8 @@ void            ioapicinit(void);
 
 // ip.c
 extern uint     MY_IP;
+extern uint     NETMASK;
+extern uint     GATEWAY;
 void            ip_init();
 void            ip_receive(void* ip_dgram, int dsize);
 void            ip_send(uchar protocol, void* buffer, uint src_ip, uint dst_ip, int size);
