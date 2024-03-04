@@ -1,7 +1,7 @@
 #define MAX_TRANSPORT_PAYLOAD_SIZE 1480 //considering Maximum Transmission Unit (MTU) of ethernet is 1500 bytes
 #define IP_ADDR_SIZE 4
 #define MINIMUM_IHL 5
-#define HDR_SIZE 20
+#define IP_HDR_SIZE 20
 #define INITIAL_TTL 64
 #define PROTOCOL_UDP 0
 #define PROTOCOL_TCP 1

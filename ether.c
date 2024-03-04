@@ -7,7 +7,7 @@
 char MAC[MAC_SIZE];
 
 // prepare and send ethernet frame
-void ether_send(uchar* destMAC, ushort type, void* payload, uint plen){
+void ether_send(uchar* destMAC, ushort type, void* payload, uint plen) {
   if(plen > ETHERNET_PAYLOAD_SIZE_MAX) {
     cprintf("maximum payload size exceeded!\n");
     return;
@@ -54,7 +54,7 @@ void ether_receive(void *eth_frame, int pkt_size) {
     data[i] = payload[i];
   data[i] = 0;
   */
-  switch type {
+  switch (type) {
     case ETHERNET_TYPE_IP:
       ip_receive(payload, pkt_size - ETHERNET_HDR_SIZE);
       return;
@@ -64,6 +64,6 @@ void ether_receive(void *eth_frame, int pkt_size) {
       return;
 
     default:
-      return
+      return;
   }
 }

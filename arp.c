@@ -25,7 +25,6 @@ void update_cache() {
   }
 }
 
-
 void arp_request(uint ip) {
   arp_packet ap;
   ap.hwd_type = htons(ARP_HTYPE_ETHERNET);
@@ -81,7 +80,6 @@ void arp_receive(void *arp_pkt) {
   if(htons(ap->op) == ARP_OP_REQUEST)
     arp_reply(arp_pkt);
   else if(htons(ap->op) == ARP_OP_REPLY) {
-    cprintf("got reply\n");
     update_cache();
     for(int i = 0; i < ARP_CACHE_SIZE; i++) {
       if(!arp_cache[i].is_valid) {
@@ -89,7 +87,6 @@ void arp_receive(void *arp_pkt) {
         memmove(arp_cache[i].mac, ap->sender_haddr, MAC_SIZE);
         arp_cache[i].is_valid = 1;
         arp_cache[i].valid_until = ticks + ARP_TTL_TICKS;
-        cprintf("%x %d %x\n", arp_cache[i].ip, arp_cache[i].is_valid, arp_cache[i].valid_until);
         break;
       }
     }

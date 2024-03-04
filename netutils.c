@@ -43,3 +43,19 @@ uint inet_addr(char ip_str[]) {
   ip |= byte;
   return ip;
 }
+
+ushort checksum(void *data, int length) {
+  ushort *p = (ushort*) data;
+  uint sum = 0;
+  while (length > 1) {
+    sum += *p;
+    sum = (sum >> 16) + (sum & 0xffff);
+    p++;
+    length -= 2;
+  }
+  if(length > 0) {
+    sum += *((uchar*) p);
+    sum = (sum >> 16) + (sum & 0xffff);
+  }
+  return ~((ushort) sum);
+}

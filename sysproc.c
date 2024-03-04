@@ -93,23 +93,12 @@ sys_uptime(void)
 int
 sys_test(void)
 {
-  /* unsigned char destMAC[] = {0x52, 0x54, 0x98, 0x76, 0x54, 0x32};
-
-  unsigned char srcMAC[] = {0x52, 0x54, 0x98, 0x76, 0x54, 0x33};
-
-  unsigned short type = 0x0000;
-
-  unsigned char payload[] = "Testing send";
-
-  uint plen = sizeof(payload);
-  cprintf("%d\n", plen);
-
-  // Send the Ethernet packet
-  ether_send(destMAC, srcMAC, type, payload, plen);
-  */
   uchar playload[] = "test";
   uint src_ip = inet_addr("192.168.2.2");
   uint dst_ip = inet_addr("192.168.2.3");
   ip_send(6, playload, src_ip, dst_ip, sizeof(playload));
   return 0;
+  /* ushort arr[10] = {0x4500, 0x003c, 0x1c46, 0x4000, 0x4006, 0x0000, 0xac10, 0x0a63, 0xac10, 0x0a0c};
+  cprintf("%x\n", checksum(arr, 20));
+  return 0; */
 }

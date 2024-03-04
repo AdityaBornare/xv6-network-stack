@@ -113,6 +113,7 @@ void            mpinit(void);
 ushort          htons(ushort n);
 uint            htonl(uint n);
 uint            inet_addr(char ip_str[]);
+ushort          checksum(void *data, int length);
 
 // pci.c
 uint            read_pci_config_register(uchar bus, uchar device, uchar function, uchar offset);
