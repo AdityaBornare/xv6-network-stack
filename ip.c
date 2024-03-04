@@ -4,6 +4,8 @@
 
 ushort id = 0;
 uint MY_IP = 0xc0a80202;
+uint NETMASK;
+uint GATEWAY;
 
 void ip_init(){
 
