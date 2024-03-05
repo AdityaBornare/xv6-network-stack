@@ -21,6 +21,16 @@ void ip_receive(void* ip_dgram, int dsize){
     return;
   }
 
+  // Check the protocol field in the IP header
+  switch (rx_pkt->ip_hdr.protocol) {
+    case IP_PROTOCOL_ICMP:
+      // If the protocol is ICMP, call the icmp_receive function
+      icmp_receive(rx_pkt->transport_payload, dsize - IP_HDR_SIZE, rx_pkt->ip_hdr.src_ip);
+      break;
+
+      // Handle other protocols (TCP, UDP, etc.) as needed
+  }
+
   // Pass the transport payload to the transport layer (UDP/TCP)
   // void* transport_payload = (void*)((uchar*)ip_dgram + (received_ip_hdr->version_ihl & 0x0F) * 4);
 

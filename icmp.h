@@ -31,21 +31,23 @@
 #define ICMP_CODE_EXCEEDED_TTL 0
 #define ICMP_CODE_EXCEEDED_FRAGMENT 1
 
+typedef struct icmp_echo {
+    ushort id;
+    ushort seq;
+} icmp_echo;
+
 typedef struct icmp_hdr {
     uchar type;
     uchar code;
     ushort sum;
     union {
-        typedef struct echo{
-            ushort id;
-            ushort seq;
-        } echo;
+        icmp_echo echo;
         uint gateway;
         uchar ptr;
         uint unused;
     } un;
     uchar data[0];
-}icmp_hdr;
+} icmp_hdr;
 
 #define ICMP_HDR_SIZE		(sizeof(icmp_hdr))
 #define IP_ICMP_HDR_SIZE	(IP_HDR_SIZE + ICMP_HDR_SIZE)
