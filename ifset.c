@@ -8,6 +8,6 @@ int main(int argc, char **argv) {
     exit();
   }
 
-  ifset(inet_addr(argv[0]), inet_addr(argv[1]), inet_addr(argv[2]));
+  ifset(inet_addr(argv[1]), inet_addr(argv[2]), inet_addr(argv[3]));
   exit();
 }
