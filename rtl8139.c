@@ -83,10 +83,10 @@ struct RTL8139_registers {
 
 static struct nic {
   volatile struct RTL8139_registers *regs;
-  unsigned char tx_buffer[TX_BUF_SIZE] __attribute__((__aligned__(4)));
-  unsigned char rx_ring[RX_BUF_LEN + 16] __attribute__((__aligned__(4)));
-  unsigned int cur_tx;
-  uchar cur_rx;
+  uchar tx_buffer[TX_BUF_SIZE] __attribute__((__aligned__(4)));
+  uchar rx_ring[RX_BUF_LEN + 16] __attribute__((__aligned__(4)));
+  uint cur_tx;
+  uint cur_rx;
   uchar packets_received_good;
   uchar byte_received;
   uint pci_device_no;
@@ -144,7 +144,6 @@ void rtl8139_set_rx_mode() {
 void rtl8139_reset(){
   // Software reset
   nic.regs->Cmd = CmdReset;
-  nic.cur_tx = 0;
 
   // Check that the chip has finished the reset
   for (int j = 1000; j > 0; j--) {
@@ -180,9 +179,10 @@ void rtl8139_reset(){
   nic.regs->ISR = 0xff;
   // Enable interrupts by setting the interrupt mask
   nic.regs->IMR = TxOK | RxOK | TxErr;
-
-	//nic.cur_rx set to 0
+  
+  // cur_rx and cur_tx set to 0
 	nic.cur_rx = 0;
+  nic.cur_tx = 0;
 }
 
 void nicinit() {
@@ -217,19 +217,6 @@ void nicinit() {
 
   //call reset
   rtl8139_reset();
-
-  cprintf("CMD = %x\n", nic.regs->Cmd);
-}
-
-void delay(int microseconds) {
-  uint start_ticks = ticks;
-
-  // Convert microseconds to ticks (assuming 10ms timer interrupt)
-  uint desired_ticks = (microseconds * 10) / 1000;
-
-  while ((ticks - start_ticks) < desired_ticks) {
-    // Wait until desired number of ticks has passed
-  }
 }
 
 void rtl8139_send(void *packet, int length){
@@ -257,13 +244,12 @@ void rtl8139_send(void *packet, int length){
 
 int rtl8139_packetOK() {
   uint ring_offset = nic.cur_rx % RX_BUF_LEN;
-	uint rx_status =  *(uint*)(nic.rx_ring + ring_offset);
+	uint rx_status = *(uint*)(nic.rx_ring + ring_offset);
 	uint rx_size = rx_status >> 16;     // Includes CRC
-	int pkt_size = rx_size - 4;
-  int bad_packet = (rx_status & RUNT) || (rx_status & LongPkt) || (rx_status & CRC) || (rx_status & FAErr);
-
+	uint pkt_size = rx_size - 4;
+  uint bad_packet = (rx_status & RUNT) || (rx_status & LongPkt) || (rx_status & CRC) || (rx_status & FAErr);
 	if(!bad_packet && (rx_status & ROK)) {
-	  if(pkt_size > RX_MAX_PKT_LENGTH || rx_size < RX_MIN_PKT_LENGTH)
+	  if(pkt_size > RX_MAX_PKT_LENGTH || pkt_size < RX_MIN_PKT_LENGTH)
 		  return 0;
 
 	  nic.packets_received_good++;
@@ -271,60 +257,43 @@ int rtl8139_packetOK() {
 
 		return 1;
 	}
-
   else
 	  return 0;
 }
 
 int rtl8139_receive() {
-  volatile uchar tmpCmd;
+  volatile uchar tmpCmd = nic.regs->Cmd;
 	uint pkt_length;
 	uchar *p_income_pkt, *rx_read_ptr;
-  uint rx_read_ptr_offset = nic.cur_rx % RX_BUF_LEN;
-	uint rx_status =  *((uint*)(nic.rx_ring + rx_read_ptr_offset));
+  nic.cur_rx = nic.cur_rx % RX_BUF_LEN;
+	uint rx_status = *((uint*)(nic.rx_ring + nic.cur_rx));
   uint rx_size = rx_status >> 16;     // Includes CRC
   pkt_length = rx_size - 4;
 
-	while(1){
-		tmpCmd = nic.regs->Cmd;
-		if(!(tmpCmd & RxBufEmpty))
-			break;
-	}
-  cprintf("rx_read_ptr_offset = %d\n", rx_read_ptr_offset);
-	do {
-	  rx_read_ptr = nic.rx_ring + rx_read_ptr_offset;
+  if(!(tmpCmd & RxBufEmpty)) {
+	  rx_read_ptr = nic.rx_ring + nic.cur_rx;
 		p_income_pkt = rx_read_ptr + 4;
 
 		if(rtl8139_packetOK()) {
-      cprintf("packet OK\n");
-		  if ( (rx_read_ptr_offset + pkt_length) > RX_BUF_LEN ){
+		  if ((nic.cur_rx + pkt_length) > RX_BUF_LEN) {
         // wrap around to end of RxBuffer
-        memmove( nic.rx_ring + RX_BUF_LEN , nic.rx_ring,
-        (rx_read_ptr_offset + pkt_length - RX_BUF_LEN));
+        memmove(nic.rx_ring, nic.rx_ring + RX_BUF_LEN, (nic.cur_rx + pkt_length - RX_BUF_LEN));
       }
 
-      // copy the packet out here
-      memmove(p_income_pkt, p_income_pkt, pkt_length - 4);  //don't copy 4 bytes CRC
-
-      // pass data to upper layer 
-      ether_receive((void*) p_income_pkt, pkt_length);
-
       // update Read Pointer
-      rx_read_ptr_offset = (rx_read_ptr_offset + rx_size + 4 + 3) & RX_READ_POINTER_MASK;
-      // 4:for header length(PktLength include 4 bytes CRC)
-      // 3:for dword alignment 
-      nic.cur_rx = rx_read_ptr_offset;
-      nic.regs->CurAddrPacket &= rx_read_ptr_offset - 0x10;
+      nic.cur_rx = (nic.cur_rx + rx_size + 4 + 3) & RX_READ_POINTER_MASK;
+      nic.regs->CurAddrPacket = nic.cur_rx - 0x10;
+
+      // pass data to upper layer
+      ether_receive((void*) p_income_pkt, pkt_length - 4);
     }
     else {
-      rtl8139_set_rx_mode();
-      break;
+      nic.cur_rx = 0;
+      nic.regs->Cmd = tmpCmd | CmdTxEnb | CmdRxEnb;
+      nic.cur_rx = (nic.cur_rx + rx_size + 4 + 3) & RX_READ_POINTER_MASK;
+      nic.regs->CurAddrPacket = nic.cur_rx - 0x10;
     }
-
-    tmpCmd = nic.regs->Cmd;
-
-  } while ((tmpCmd & RxBufEmpty));
-
+  }
   return 1;
 }
 

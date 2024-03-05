@@ -1,7 +1,7 @@
 #include "types.h"
 #include "defs.h"
 
-void delay(int milliseconds) {
+void delay(uint milliseconds) {
   uint start_ticks = ticks;
 
   while ((ticks - start_ticks) < milliseconds) {
