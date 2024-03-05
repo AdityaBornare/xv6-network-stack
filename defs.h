@@ -206,7 +206,7 @@ void            uartintr(void);
 void            uartputc(int);
 
 // utils.c
-void            delay(int milliseconds);
+void            delay(uint milliseconds);
 
 // vm.c
 void            seginit(void);
