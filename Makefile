@@ -6,6 +6,7 @@ OBJS = \
 	exec.o\
 	file.o\
 	fs.o\
+  icmp.o\
 	ide.o\
 	ioapic.o\
 	ip.o\

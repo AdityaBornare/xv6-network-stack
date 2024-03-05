@@ -3,8 +3,9 @@
 #define MINIMUM_IHL 5
 #define IP_HDR_SIZE 20
 #define INITIAL_TTL 64
-#define PROTOCOL_UDP 0
-#define PROTOCOL_TCP 1
+#define IP_PROTOCOL_ICMP 0x01
+#define IP_PROTOCOL_TCP  0x06
+#define IP_PROTOCOL_UDP  0x11
 
 /*note- ip header structure is according to rfc791-INTERNET PROTOCOL
   Not included the options field in header as it is needed for advanced or specialized networking feature
