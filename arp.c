@@ -59,6 +59,14 @@ void arp_reply(void *arp_pkt) {
   ether_send(req->sender_haddr, ETHERNET_TYPE_ARP, (void*) &rep, sizeof(rep));
 }
 
+void busy_wait() {
+  uint j = 0;
+  while(request_pending == 1 && j < 0xffffffff) {
+    for(uint k = 0; k < 0xffffffff; k++);
+    j++;
+  }
+}
+
 uchar *arp_resolve(uint ip) {
   if((ip & NETMASK) != (MY_IP & NETMASK))
     ip = GATEWAY;
@@ -66,14 +74,19 @@ uchar *arp_resolve(uint ip) {
   i = search_cache(ip);
   if(i != -1)
     return arp_cache[i].mac;
-
-  request_pending = 1;
-  arp_request(ip);
-  while(request_pending == 1) {
-    delay(10);
+  // request_pending = 1;
+  // arp_request(ip);
+  for(int retries = 10; retries > 0; retries--) {
+    request_pending = 1;
+    arp_request(ip);
+    busy_wait();
+    request_pending = 0;
+  }
+  if(request_pending == 1) {
+    request_pending = 0;
+    return 0;
   }
   i = search_cache(ip);
-  cprintf("i = %d\n", i);
   return arp_cache[i].mac;
 }
 

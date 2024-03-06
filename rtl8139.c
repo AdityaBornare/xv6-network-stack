@@ -233,7 +233,7 @@ void rtl8139_send(void *packet, int length){
     nic.tx_buffer[len++] = '\0';
   }
 
-  cprintf("sending %d bytes\n", len);
+  // cprintf("sending %d bytes\n", len);
 
   *(&nic.regs->TxAddr0 + nic.cur_tx) = V2P((uint)nic.tx_buffer);
   txstatus = (TX_FIFO_THRESH << 11 | len) & 0xffffdfff;
@@ -285,7 +285,7 @@ int rtl8139_receive() {
       nic.regs->CurAddrPacket = nic.cur_rx - 0x10;
 
       // pass data to upper layer
-      ether_receive((void*) p_income_pkt, pkt_length - 4);
+      ether_receive((void*) p_income_pkt, pkt_length);
     }
     else {
       nic.cur_rx = 0;

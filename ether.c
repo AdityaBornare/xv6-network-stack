@@ -15,7 +15,7 @@ void ether_send(uchar* destMAC, ushort type, void* payload, uint plen) {
   ether_hdr *header;
   uint flen;
 
-  cprintf("size of payload : %d\n", plen);
+  // cprintf("size of payload : %d\n", plen);
   uchar frame[ETHERNET_FRAME_SIZE_MAX];
 
   header = (ether_hdr*)frame;
@@ -36,7 +36,7 @@ void ether_send(uchar* destMAC, ushort type, void* payload, uint plen) {
 
   flen = ETHERNET_HDR_SIZE + plen;
 
-  cprintf("size of frame : %d\n",flen);
+  // cprintf("size of frame : %d\n",flen);
 
   // Send the Ethernet frame using rtl8139_send
   rtl8139_send((void*)&frame, flen);

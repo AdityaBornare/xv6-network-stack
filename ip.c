@@ -18,9 +18,8 @@ void ip_init(){
 void ip_receive(void* ip_dgram, int dsize){
   // Extract the network layer packet from the Ethernet frame
   ip_packet* rx_pkt = (ip_packet*) ip_dgram;
-
-  if (dsize != rx_pkt->ip_hdr.tlen) {
-    cprintf("Invalid packet size.\n");
+  if (dsize != htons(rx_pkt->ip_hdr.tlen)) {
+    cprintf("Invalid packet length.\n");
     return;
   }
   // header checks
@@ -75,10 +74,12 @@ void ip_send(uchar protocol, void* buffer, uint src_ip, uint dst_ip, int size) {
   }
   else {
     uchar *destMAC = arp_resolve(dst_ip);
-    for(int i = 0; i < 6; i++) {
+    if(destMAC == 0)
+      return;
+    /* for(int i = 0; i < 6; i++) {
       cprintf("%x ", destMAC[i]);
     }
-    cprintf("\n");
+    cprintf("\n");*/
     ether_send(destMAC, 0x0800, &pkt, IP_HDR_SIZE + size);
   }
 }
