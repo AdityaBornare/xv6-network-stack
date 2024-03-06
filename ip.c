@@ -19,8 +19,9 @@ void ip_receive(void* ip_dgram, int dsize){
   // Extract the network layer packet from the Ethernet frame
   ip_packet* rx_pkt = (ip_packet*) ip_dgram;
 
-  if (dsize < sizeof(ip_header)) {
-      return;
+  if (dsize != rx_pkt->ip_hdr.tlen) {
+    cprintf("Invalid packet size.\n");
+    return;
   }
   // header checks
   if ((rx_pkt->ip_hdr.version_ihl >> 4) != IP_VERSION_4) {
