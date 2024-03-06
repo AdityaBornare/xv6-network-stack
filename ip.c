@@ -4,8 +4,8 @@
 
 ushort id = 0;
 uint MY_IP = 0xc0a80202;
-uint NETMASK;
-uint GATEWAY;
+uint NETMASK = 0xffffff00;
+uint GATEWAY = 0xc0a80201;
 
 void ip_init(){
 
@@ -27,7 +27,7 @@ void ip_receive(void* ip_dgram, int dsize){
   switch (rx_pkt->ip_hdr.protocol) {
     case IP_PROTOCOL_ICMP:
       // If the protocol is ICMP, call the icmp_receive function
-      icmp_receive(rx_pkt->transport_payload, dsize - IP_HDR_SIZE, rx_pkt->ip_hdr.src_ip);
+      icmp_receive(rx_pkt->transport_payload, dsize - IP_HDR_SIZE, htonl(rx_pkt->ip_hdr.src_ip));
       break;
 
       // Handle other protocols (TCP, UDP, etc.) as needed
@@ -51,9 +51,7 @@ void ip_send(uchar protocol, void* buffer, uint src_ip, uint dst_ip, int size) {
   pkt.ip_hdr.src_ip = htonl(src_ip);
   pkt.ip_hdr.dst_ip = htonl(dst_ip);
   pkt.ip_hdr.checksum = 0;
-  cprintf("%x\n", checksum(&pkt.ip_hdr, IP_HDR_SIZE));
   pkt.ip_hdr.checksum = checksum(&pkt.ip_hdr, IP_HDR_SIZE);
-  cprintf("%x\n", checksum(&pkt.ip_hdr, IP_HDR_SIZE));
   memmove(pkt.transport_payload, buffer, size);
 
   if (dst_ip == 0xffffffff) {

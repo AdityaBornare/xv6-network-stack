@@ -60,6 +60,8 @@ void arp_reply(void *arp_pkt) {
 }
 
 uchar *arp_resolve(uint ip) {
+  if((ip & NETMASK) != (MY_IP & NETMASK))
+    ip = GATEWAY;
   int i;
   i = search_cache(ip);
   if(i != -1)
