@@ -18,10 +18,7 @@ void ip_init(){
 void ip_receive(void* ip_dgram, int dsize){
   // Extract the network layer packet from the Ethernet frame
   ip_packet* rx_pkt = (ip_packet*) ip_dgram;
-  if (dsize != htons(rx_pkt->ip_hdr.tlen)) {
-    cprintf("Invalid packet length.\n");
-    return;
-  }
+
   // header checks
   if ((rx_pkt->ip_hdr.version_ihl >> 4) != IP_VERSION_4) {
     cprintf("Not an IPv4 packet.\n");

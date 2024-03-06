@@ -74,17 +74,18 @@ uchar *arp_resolve(uint ip) {
   i = search_cache(ip);
   if(i != -1)
     return arp_cache[i].mac;
-  // request_pending = 1;
-  // arp_request(ip);
-  for(int retries = 10; retries > 0; retries--) {
-    request_pending = 1;
-    arp_request(ip);
+
+  request_pending = 1;
+  arp_request(ip);
+  /*
+  for(uint j = 0; j < 0xffffffff; j++)
     busy_wait();
-    request_pending = 0;
-  }
   if(request_pending == 1) {
     request_pending = 0;
     return 0;
+  }*/
+  while(request_pending) {
+    busy_wait();
   }
   i = search_cache(ip);
   return arp_cache[i].mac;
