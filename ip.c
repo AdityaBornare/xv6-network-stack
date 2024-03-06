@@ -2,6 +2,8 @@
 #include "defs.h"
 #include "ip.h"
 
+#define IP_VERSION_4 4
+
 ushort id = 0;
 uint MY_IP = 0xc0a80202;
 uint NETMASK = 0xffffff00;
@@ -17,6 +19,19 @@ void ip_receive(void* ip_dgram, int dsize){
   // Extract the network layer packet from the Ethernet frame
   ip_packet* rx_pkt = (ip_packet*) ip_dgram;
 
+  if (dsize != rx_pkt->ip_hdr.tlen) {
+    cprintf("Invalid packet size.\n");
+    return;
+  }
+  // header checks
+  if ((rx_pkt->ip_hdr.version_ihl >> 4) != IP_VERSION_4) {
+    cprintf("Not an IPv4 packet.\n");
+    return;
+  }
+  if (!rx_pkt->ip_hdr.ttl) {
+    cprintf("Received IP packet was dead with TTL=0.\n");
+    return;
+  }
   // validate checksum
   if ((checksum(&rx_pkt->ip_hdr, IP_HDR_SIZE)) != 0) {
     cprintf("Invalid checksum\n");
