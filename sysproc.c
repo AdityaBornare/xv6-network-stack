@@ -95,7 +95,7 @@ sys_test(void)
 {
   uchar playload[] = "test";
   uint src_ip = inet_addr("192.168.2.2");
-  uint dst_ip = inet_addr("192.168.2.1");
+  uint dst_ip = inet_addr("192.168.3.2");
   ip_send(6, playload, src_ip, dst_ip, sizeof(playload));
   return 0;
 }
