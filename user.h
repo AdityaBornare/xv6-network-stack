@@ -25,6 +25,7 @@ int sleep(int);
 int uptime(void);
 int test(void);
 void ifset(uint, uint, uint);
+void ifconfig();
 
 // ulib.c
 int stat(const char*, struct stat*);

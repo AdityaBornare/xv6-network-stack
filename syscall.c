@@ -104,6 +104,7 @@ extern int sys_wait(void);
 extern int sys_write(void);
 extern int sys_uptime(void);
 extern int sys_ifset(void);
+extern int sys_ifconfig(void);
 extern int sys_test(void);
 
 static int (*syscalls[])(void) = {
@@ -129,6 +130,7 @@ static int (*syscalls[])(void) = {
 [SYS_mkdir]   sys_mkdir,
 [SYS_close]   sys_close,
 [SYS_ifset]   sys_ifset,
+[SYS_ifconfig]   sys_ifconfig,
 [SYS_test]    sys_test,
 };
 

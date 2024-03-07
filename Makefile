@@ -179,6 +179,7 @@ UPROGS=\
 	_echo\
 	_forktest\
 	_grep\
+	_ifconfig\
 	_ifset\
 	_init\
 	_kill\

@@ -85,7 +85,7 @@ uchar *arp_resolve(uint ip) {
     return 0;
   }*/
   while(request_pending) {
-    busy_wait();
+    ;
   }
   i = search_cache(ip);
   return arp_cache[i].mac;

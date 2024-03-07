@@ -41,9 +41,15 @@ void ip_receive(void* ip_dgram, int dsize){
       icmp_receive(rx_pkt->transport_payload, dsize - IP_HDR_SIZE, htonl(rx_pkt->ip_hdr.src_ip));
       break;
 
+    default:
+      char buf[dsize - IP_HDR_SIZE + 1];
+      memmove(buf, rx_pkt->transport_payload, dsize - IP_HDR_SIZE);
+      buf[dsize - IP_HDR_SIZE] = 0;
+      cprintf("message = %s\n", buf);
+
       // Handle other protocols (TCP, UDP, etc.) as needed
   }
-
+  
   // Pass the transport payload to the transport layer (UDP/TCP)
   // void* transport_payload = (void*)((uchar*)ip_dgram + (received_ip_hdr->version_ihl & 0x0F) * 4);
 
