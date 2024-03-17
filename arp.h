@@ -17,9 +17,11 @@ struct arp_packet {
 
 typedef struct arp_packet arp_packet;
 
+enum entry_status {EMPTY, USED, REQUESTED};
+
 typedef struct arp_entry {
   uint ip;
   uchar mac[HADDR_SIZE];
   uint valid_until;
-  uint is_valid;
+  enum entry_status status;
 } arp_entry;

@@ -1,5 +1,6 @@
 #include "types.h"
 #include "defs.h"
+#include "spinlock.h"
 #include "arp.h"
 #include "ether.h"
 #include "ip.h"
@@ -7,22 +8,49 @@
 #define ARP_CACHE_SIZE 10
 #define ARP_TTL_TICKS 20 * 60 * 100
 
-arp_entry arp_cache[ARP_CACHE_SIZE];
-uint request_pending = 0;
+struct { 
+  struct spinlock lk;
+  arp_entry cache[ARP_CACHE_SIZE];
+} arp_cache;
+
+void arpinit() {
+  initlock(&arp_cache.lk, "arp cache");
+}
 
 int search_cache(uint ip) {
   for(int i = 0; i < ARP_CACHE_SIZE; i++) {
-    if(arp_cache[i].ip == ip && arp_cache[i].is_valid && ticks <= arp_cache[i].valid_until)
+    if(arp_cache.cache[i].ip == ip && arp_cache.cache[i].status == USED && ticks <= arp_cache.cache[i].valid_until)
       return i;
   }
   return -1;
 }
 
-void update_cache() {
+int cache_get() {
   for(int i = 0; i < ARP_CACHE_SIZE; i++) {
-    if(arp_cache[i].is_valid == 1 && ticks > arp_cache[i].valid_until)
-      arp_cache[i].is_valid = 0;
+    // empty block
+    if(arp_cache.cache[i].status == EMPTY)
+      return i;
+
+    // timed out entry
+    if(arp_cache.cache[i].status == USED && arp_cache.cache[i].valid_until < ticks) {
+      arp_cache.cache[i].status = EMPTY;
+      return i;
+    }
   }
+
+  // envict oldest entry
+  uint minticks = 0xffffffff;
+  int i_min = -1;
+  for(int i = 0; i < ARP_CACHE_SIZE; i++) {
+    if(arp_cache.cache[i].status != REQUESTED && arp_cache.cache[i].valid_until < minticks) {
+      minticks = arp_cache.cache[i].valid_until;
+      i_min = i;
+    }
+  }
+  if(i_min == -1)
+    panic("arp cache full");
+  arp_cache.cache[i_min].status = EMPTY;
+  return i_min;
 }
 
 void arp_request(uint ip) {
@@ -59,53 +87,69 @@ void arp_reply(void *arp_pkt) {
   ether_send(req->sender_haddr, ETHERNET_TYPE_ARP, (void*) &rep, sizeof(rep));
 }
 
-void busy_wait() {
-  uint j = 0;
-  while(request_pending == 1 && j < 0xffffffff) {
-    for(uint k = 0; k < 0xffffffff; k++);
-    j++;
-  }
-}
-
 uchar *arp_resolve(uint ip) {
   if((ip & NETMASK) != (MY_IP & NETMASK))
     ip = GATEWAY;
   int i;
-  i = search_cache(ip);
-  if(i != -1)
-    return arp_cache[i].mac;
 
-  request_pending = 1;
-  arp_request(ip);
-  /*
-  for(uint j = 0; j < 0xffffffff; j++)
-    busy_wait();
-  if(request_pending == 1) {
-    request_pending = 0;
-    return 0;
-  }*/
-  while(request_pending) {
-    ;
+  acquire(&arp_cache.lk);
+
+  // search in cache
+  for(int i = 0; i < ARP_CACHE_SIZE; i++) {
+    if(arp_cache.cache[i].ip != ip)
+      continue;
+
+    if(arp_cache.cache[i].status == USED && ticks <= arp_cache.cache[i].valid_until) {
+      // found in cache
+      release(&arp_cache.lk);
+      return arp_cache.cache[i].mac;
+    }
+
+    if(arp_cache.cache[i].status == REQUESTED) {
+      // already requested
+      if(myproc() != 0)
+        sleep(&arp_cache.cache[i], &arp_cache.lk);
+      release(&arp_cache.lk);
+      return arp_cache.cache[i].mac;
+    }
   }
-  i = search_cache(ip);
-  return arp_cache[i].mac;
+  
+  // not found in cache, send request
+  i = cache_get();
+  arp_cache.cache[i].ip = ip;
+  arp_cache.cache[i].status = REQUESTED;
+  arp_request(ip);
+  if(myproc() != 0)
+    sleep(&arp_cache.cache[i], &arp_cache.lk);
+  release(&arp_cache.lk);
+  return arp_cache.cache[i].mac;
 }
 
 void arp_receive(void *arp_pkt) {
   arp_packet* ap = (arp_packet*) arp_pkt;
   if(htons(ap->op) == ARP_OP_REQUEST)
     arp_reply(arp_pkt);
+
   else if(htons(ap->op) == ARP_OP_REPLY) {
-    update_cache();
-    for(int i = 0; i < ARP_CACHE_SIZE; i++) {
-      if(!arp_cache[i].is_valid) {
-        arp_cache[i].ip = htonl(ap->sender_paddr);
-        memmove(arp_cache[i].mac, ap->sender_haddr, MAC_SIZE);
-        arp_cache[i].is_valid = 1;
-        arp_cache[i].valid_until = ticks + ARP_TTL_TICKS;
+    uint ip = htonl(ap->sender_paddr);
+    int i;
+
+    acquire(&arp_cache.lk);
+
+    for(i = 0; i < ARP_CACHE_SIZE; i++) {
+      if(arp_cache.cache[i].ip == ip && arp_cache.cache[i].status == REQUESTED)
         break;
-      }
     }
-    request_pending = 0;
+
+    if(i == ARP_CACHE_SIZE) {
+      release(&arp_cache.lk);
+      return;
+    }
+
+    memmove(arp_cache.cache[i].mac, ap->sender_haddr, HADDR_SIZE);
+    arp_cache.cache[i].valid_until = ticks + ARP_TTL_TICKS;
+    arp_cache.cache[i].status = USED;
+    release(&arp_cache.lk);
+    wakeup(&arp_cache.cache[i]);
   }
 }

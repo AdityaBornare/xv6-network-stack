@@ -11,7 +11,8 @@ struct stat;
 struct superblock;
 
 // arp.c
-uchar           *arp_resolve(uint ip);
+void            arpinit();
+uchar*          arp_resolve(uint ip);
 void            arp_receive(void *arp_pkt);
 
 // bio.c
@@ -116,6 +117,7 @@ extern int      ismp;
 void            mpinit(void);
 
 // netutils.c
+void            netinit();
 ushort          htons(ushort n);
 uint            htonl(uint n);
 uint            inet_addr(char ip_str[]);

@@ -1,6 +1,11 @@
 #include "types.h"
 #include "defs.h"
 
+void netinit() {
+  nicinit();
+  arpinit();
+}
+
 ushort htons(ushort n) {
   ushort a = 0;
   ushort b;
