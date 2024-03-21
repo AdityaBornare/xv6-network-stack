@@ -242,18 +242,12 @@ void rtl8139_send(void *packet, int length){
   txstatus = *(&nic.regs->TxStatus0 + nic.cur_tx);
 }
 
-int rtl8139_packetOK() {
-  uint ring_offset = nic.cur_rx % RX_BUF_LEN;
-	uint rx_status = *(uint*)(nic.rx_ring + ring_offset);
-	uint rx_size = rx_status >> 16;     // Includes CRC
-	uint pkt_size = rx_size - 4;
+int rtl8139_packetOK(uint rx_status, uint rx_size, uint pkt_length) {
+
   uint bad_packet = (rx_status & RUNT) || (rx_status & LongPkt) || (rx_status & CRC) || (rx_status & FAErr);
 	if(!bad_packet && (rx_status & ROK)) {
-	  if(pkt_size > RX_MAX_PKT_LENGTH || pkt_size < RX_MIN_PKT_LENGTH)
+	  if(pkt_length > RX_MAX_PKT_LENGTH || pkt_length < RX_MIN_PKT_LENGTH)
 		  return 0;
-
-	  nic.packets_received_good++;
-	  nic.byte_received += pkt_size;
 
 		return 1;
 	}
@@ -274,7 +268,7 @@ int rtl8139_receive() {
 	  rx_read_ptr = nic.rx_ring + nic.cur_rx;
 		p_income_pkt = rx_read_ptr + 4;
 
-		if(rtl8139_packetOK()) {
+		if(rtl8139_packetOK(rx_status, rx_size, pkt_length)) {
 		  if ((nic.cur_rx + pkt_length) > RX_BUF_LEN) {
         // wrap around to end of RxBuffer
         memmove(nic.rx_ring, nic.rx_ring + RX_BUF_LEN, (nic.cur_rx + pkt_length - RX_BUF_LEN));
@@ -284,6 +278,8 @@ int rtl8139_receive() {
       nic.cur_rx = (nic.cur_rx + rx_size + 4 + 3) & RX_READ_POINTER_MASK;
       nic.regs->CurAddrPacket = nic.cur_rx - 0x10;
 
+      nic.packets_received_good++;
+      nic.byte_received += pkt_length;
       // pass data to upper layer
       ether_receive((void*) p_income_pkt, pkt_length);
     }
