@@ -93,16 +93,12 @@ sys_uptime(void)
 int
 sys_test(void)
 {
-  char *payload;
+  char payload[] = "test";
   uint dst_ip;
 
-  if(argstr(0, &payload) < 0)
+  if(argint(0, (int*)&dst_ip) < 0)
     return -1;
 
-  if(argint(1, (int*)&dst_ip) < 0)
-    return -1;
-
-  uint src_ip = inet_addr("192.168.2.2");
-  ip_send(6, (uchar*)payload, src_ip, dst_ip, sizeof(payload));
+  ip_send(6, (uchar*)payload, MY_IP, dst_ip, sizeof(payload));
   return 0;
 }

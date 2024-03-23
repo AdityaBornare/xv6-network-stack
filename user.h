@@ -23,7 +23,7 @@ int getpid(void);
 char* sbrk(int);
 int sleep(int);
 int uptime(void);
-int test(void);
+int test(uint);
 void ifset(uint, uint, uint);
 void ifconfig();
 
