@@ -17,15 +17,8 @@ void arpinit() {
   initlock(&arp_cache.lk, "arp cache");
 }
 
-int search_cache(uint ip) {
-  for(int i = 0; i < ARP_CACHE_SIZE; i++) {
-    if(arp_cache.cache[i].ip == ip && arp_cache.cache[i].status == USED && ticks <= arp_cache.cache[i].valid_until)
-      return i;
-  }
-  return -1;
-}
-
-int cache_get() {
+// call only when the arp cache lock is held
+int arp_alloc() {
   for(int i = 0; i < ARP_CACHE_SIZE; i++) {
     // empty block
     if(arp_cache.cache[i].status == EMPTY)
@@ -51,6 +44,17 @@ int cache_get() {
     panic("arp cache full");
   arp_cache.cache[i_min].status = EMPTY;
   return i_min;
+}
+
+int arp_search(uint ip) {
+  for(int i = 0; i < ARP_CACHE_SIZE; i++) {
+    if(arp_cache.cache[i].ip != ip)
+      continue;
+
+    if(arp_cache.cache[i].status == USED && ticks <= arp_cache.cache[i].valid_until) // found in cache
+      return i;
+  }
+  return -1;
 }
 
 void arp_request(uint ip) {
@@ -95,34 +99,65 @@ uchar *arp_resolve(uint ip) {
   acquire(&arp_cache.lk);
 
   // search in cache
-  for(int i = 0; i < ARP_CACHE_SIZE; i++) {
-    if(arp_cache.cache[i].ip != ip)
-      continue;
+  i = arp_search(ip);
+  if(i != -1) {
+    release(&arp_cache.lk);
+    return arp_cache.cache[i].mac;
+  }
 
-    if(arp_cache.cache[i].status == USED && ticks <= arp_cache.cache[i].valid_until) {
-      // found in cache
-      release(&arp_cache.lk);
-      return arp_cache.cache[i].mac;
-    }
-
-    if(arp_cache.cache[i].status == REQUESTED) {
+  // check if already requested
+  for(i = 0; i < ARP_CACHE_SIZE; i++) {
+    if(arp_cache.cache[i].ip == ip && arp_cache.cache[i].status == REQUESTED) {
       // already requested
-      if(myproc() != 0)
-        sleep(&arp_cache.cache[i], &arp_cache.lk);
+      sleep(&arp_cache.cache[i], &arp_cache.lk);
       release(&arp_cache.lk);
       return arp_cache.cache[i].mac;
     }
   }
   
   // not found in cache, send request
-  i = cache_get();
+  i = arp_alloc();
   arp_cache.cache[i].ip = ip;
   arp_cache.cache[i].status = REQUESTED;
   arp_request(ip);
-  if(myproc() != 0)
-    sleep(&arp_cache.cache[i], &arp_cache.lk);
+  sleep(&arp_cache.cache[i], &arp_cache.lk);
   release(&arp_cache.lk);
   return arp_cache.cache[i].mac;
+}
+
+void arp_add(uint ip, uchar *mac) {
+  int i;
+  int requested = 0;
+  acquire(&arp_cache.lk);
+
+  i = arp_search(ip);
+  if(i != -1) {
+    // already present in cache
+    release(&arp_cache.lk);
+    return;
+  }
+
+  for(i = 0; i < ARP_CACHE_SIZE; i++) {
+    if(arp_cache.cache[i].ip == ip && arp_cache.cache[i].status == REQUESTED) {
+      // already requested
+      requested = 1;
+      break;
+    }
+  }
+
+  if(!requested) // allocate new entry
+    i = arp_alloc();
+
+  arp_cache.cache[i].ip = ip;
+  memmove(arp_cache.cache[i].mac, mac, HADDR_SIZE);
+  arp_cache.cache[i].valid_until = ticks + ARP_TTL_TICKS;
+  arp_cache.cache[i].status = USED;
+
+  if(requested)
+    wakeup(&arp_cache.cache[i]);
+
+  release(&arp_cache.lk);
+  return;
 }
 
 void arp_receive(void *arp_pkt) {
@@ -149,7 +184,7 @@ void arp_receive(void *arp_pkt) {
     memmove(arp_cache.cache[i].mac, ap->sender_haddr, HADDR_SIZE);
     arp_cache.cache[i].valid_until = ticks + ARP_TTL_TICKS;
     arp_cache.cache[i].status = USED;
-    release(&arp_cache.lk);
     wakeup(&arp_cache.cache[i]);
+    release(&arp_cache.lk);
   }
 }

@@ -47,16 +47,9 @@ void ether_receive(void *eth_frame, int pkt_size) {
   ether_hdr *header = (ether_hdr*) eth_frame;
   char *payload = (char*) (header + 1);
   ushort type = htons(header->type);
-  // char data[pkt_size + 1];
-  // int i;
-  /*
-  for(i = 0; i < pkt_size - ETHERNET_HDR_SIZE; i++)
-    data[i] = payload[i];
-  data[i] = 0;
-  */
   switch (type) {
     case ETHERNET_TYPE_IP:
-      ip_receive(payload, pkt_size - ETHERNET_HDR_SIZE);
+      ip_receive(payload, pkt_size - ETHERNET_HDR_SIZE, header->src);
       return;
 
     case ETHERNET_TYPE_ARP:

@@ -9,14 +9,14 @@ uint MY_IP = 0xc0a80202;
 uint NETMASK = 0xffffff00;
 uint GATEWAY = 0xc0a80201;
 
-void ip_init(){
+void ip_init() {
 
-  // Initialize network layer, setup routing tables, etc.
+  // initialize network layer, setup routing tables, etc.
 
 }
 
-void ip_receive(void* ip_dgram, int dsize){
-  // Extract the network layer packet from the Ethernet frame
+void ip_receive(void* ip_dgram, int dsize, uchar *rx_mac) {
+  // extract the network layer packet from the Ethernet frame
   ip_packet* rx_pkt = (ip_packet*) ip_dgram;
 
   // header checks
@@ -34,10 +34,15 @@ void ip_receive(void* ip_dgram, int dsize){
     return;
   }
 
-  // Check the protocol field in the IP header
+  // add ip - mac mapping into arp cache
+  if ((htonl(rx_pkt->ip_hdr.src_ip) & GATEWAY) == (MY_IP & GATEWAY)) {
+    arp_add(htonl(rx_pkt->ip_hdr.src_ip), rx_mac);
+  }
+
+  // check the protocol field in the IP header
   switch (rx_pkt->ip_hdr.protocol) {
     case IP_PROTOCOL_ICMP:
-      // If the protocol is ICMP, call the icmp_receive function
+      // if the protocol is ICMP, call the icmp_receive function
       icmp_receive(rx_pkt->transport_payload, dsize - IP_HDR_SIZE, htonl(rx_pkt->ip_hdr.src_ip));
       break;
 
@@ -47,13 +52,13 @@ void ip_receive(void* ip_dgram, int dsize){
       buf[dsize - IP_HDR_SIZE] = 0;
       cprintf("message = %s\n", buf);
 
-      // Handle other protocols (TCP, UDP, etc.) as needed
+      // handle other protocols (TCP, UDP, etc.) as needed
   }
   
-  // Pass the transport payload to the transport layer (UDP/TCP)
+  // pass the transport payload to the transport layer (UDP/TCP)
   // void* transport_payload = (void*)((uchar*)ip_dgram + (received_ip_hdr->version_ihl & 0x0F) * 4);
 
-  // The transport layer will handle the headers internally
+  // the transport layer will handle the headers internally
 }
 
 void ip_send(uchar protocol, void* buffer, uint src_ip, uint dst_ip, int size) {
@@ -79,10 +84,6 @@ void ip_send(uchar protocol, void* buffer, uint src_ip, uint dst_ip, int size) {
     uchar *destMAC = arp_resolve(dst_ip);
     if(destMAC == 0)
       return;
-    /* for(int i = 0; i < 6; i++) {
-      cprintf("%x ", destMAC[i]);
-    }
-    cprintf("\n");*/
     ether_send(destMAC, 0x0800, &pkt, IP_HDR_SIZE + size);
   }
 }

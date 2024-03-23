@@ -14,6 +14,8 @@ sys_ifset(void)
   NETMASK = netmask;
   GATEWAY = gateway;
 
+  arp_resolve(GATEWAY);
+
   return 0;
 }
 

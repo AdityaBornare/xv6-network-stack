@@ -13,6 +13,7 @@ struct superblock;
 // arp.c
 void            arpinit();
 uchar*          arp_resolve(uint ip);
+void            arp_add(uint ip, uchar *mac);
 void            arp_receive(void *arp_pkt);
 
 // bio.c
@@ -85,7 +86,7 @@ extern uint     MY_IP;
 extern uint     NETMASK;
 extern uint     GATEWAY;
 void            ip_init();
-void            ip_receive(void* ip_dgram, int dsize);
+void            ip_receive(void* ip_dgram, int dsize, uchar *rx_mac);
 void            ip_send(uchar protocol, void* buffer, uint src_ip, uint dst_ip, int size);
 
 // kalloc.c
