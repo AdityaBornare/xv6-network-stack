@@ -93,9 +93,12 @@ sys_uptime(void)
 int
 sys_test(void)
 {
-  uchar playload[] = "test";
-  uint src_ip = inet_addr("192.168.2.2");
-  uint dst_ip = inet_addr("192.168.3.2");
-  ip_send(6, playload, src_ip, dst_ip, sizeof(playload));
+  char payload[] = "test";
+  uint dst_ip;
+
+  if(argint(0, (int*)&dst_ip) < 0)
+    return -1;
+
+  ip_send(6, (uchar*)payload, MY_IP, dst_ip, sizeof(payload));
   return 0;
 }
