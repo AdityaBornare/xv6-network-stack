@@ -198,6 +198,10 @@ int             fetchint(uint, int*);
 int             fetchstr(uint, char**);
 void            syscall(void);
 
+// tcp.c
+void            tcp_send(void);
+void            tcp_receive(void);
+
 // timer.c
 void            timerinit(void);
 

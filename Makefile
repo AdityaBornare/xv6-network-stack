@@ -30,6 +30,7 @@ OBJS = \
 	sysfile.o\
 	sysnet.o\
 	sysproc.o\
+  tcp.o\
 	trapasm.o\
 	trap.o\
 	uart.o\
