@@ -27,3 +27,28 @@ sys_ifconfig(void)
   cprintf("Gateway: %d.%d.%d.%d\n", (GATEWAY >> 24) & 0xFF, (GATEWAY >> 16) & 0xFF, (GATEWAY >> 8) & 0xFF, GATEWAY & 0xFF);
   return 0;
 }
+
+int
+sys_socket(void)
+{
+  return 0;
+}
+
+int
+sys_bind(void)
+{
+  return 0;
+}
+
+int
+sys_listen(void)
+{
+  return 0;
+}
+
+int
+sys_connect(void)
+{
+  return 0;
+}
+

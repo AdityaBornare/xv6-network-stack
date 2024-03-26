@@ -22,4 +22,8 @@
 #define SYS_close  21
 #define SYS_ifset  22
 #define SYS_ifconfig 23
-#define SYS_test   24
+#define SYS_socket 24
+#define SYS_bind 25
+#define SYS_listen 26
+#define SYS_connect 27
+#define SYS_test   28

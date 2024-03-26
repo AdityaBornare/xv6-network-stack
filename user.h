@@ -23,9 +23,14 @@ int getpid(void);
 char* sbrk(int);
 int sleep(int);
 int uptime(void);
-int test(uint);
 void ifset(uint, uint, uint);
 void ifconfig();
+void socket();
+void bind();
+void listen();
+void connect();
+int test(uint);
+
 
 // ulib.c
 int stat(const char*, struct stat*);
