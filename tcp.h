@@ -11,22 +11,19 @@
 
 //TCP header
 typedef struct tcp_hdr {
-    ushort src_port;      // Source port number
-    ushort dst_port;      // Destination port number
-    uint seq_num;         // Sequence number
-    uint ack_num;         // Acknowledgment number
-    uchar offset;            // Data offset
-    uchar flags;          // control flags
-    ushort window_size;   // Window size
-    ushort checksum;      // Header checksum
-    ushort urgent_ptr;    // Urgent pointer
+  ushort src_port;      // Source port number
+  ushort dst_port;      // Destination port number
+  uint seq_num;         // Sequence number
+  uint ack_num;         // Acknowledgment number
+  uchar offset;         // Data offset
+  uchar flags;          // control flags
+  ushort window_size;   // Window size
+  ushort checksum;      // Header checksum
+  ushort urgent_ptr;    // Urgent pointer
 }tcp_hdr;
 
 //TCP packet structure (header + data)
 typedef struct tcp_packet {
-    tcp_hdr header;       // TCP header
-    uchar data[];         // Data field (variable length)
+  tcp_hdr header;       // TCP header
+  uchar data[];         // Data field (variable length)
 }tcp_packet;
-
-void tcp_receive();
-void tcp_send();
