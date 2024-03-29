@@ -1,10 +1,8 @@
-struct port {
-  uchar used;
-  int pid;
-}
+enum socket_type {TCP};
 
 struct socket {
   uint addr;
   ushort src_port;
-  struct tcp_connection;
-}
+  socket_type type;
+  struct tcp_connection tcon;
+};

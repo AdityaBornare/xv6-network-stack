@@ -11,14 +11,15 @@
 
 // TCP header
 struct tcp_hdr {
-  ushort src_port;       // Source port number
-  ushort dst_port;       // Destination port number
-  uint seq_num;          // Sequence number
-  uint ack_num;          // Acknowledgment number
-  ushort offset_flags;   // 4 bits - Data offset, 4 bits - reserved (0), 6 bits - flags
-  ushort window_size;    // Window size
-  ushort checksum;       // Header checksum
-  ushort urgent_ptr;     // Urgent pointer
+  ushort src_port;      // Source port number
+  ushort dst_port;      // Destination port number
+  uint seq_num;         // Sequence number
+  uint ack_num;         // Acknowledgment number
+  uchar offset;         // Data offset = header length
+  uchar flags;          // Control flags
+  ushort window_size;   // Window size
+  ushort checksum;      // Header checksum
+  ushort urgent_ptr;    // Urgent pointer
 };
 
 // TCP packet structure (header + data)
@@ -31,6 +32,8 @@ struct tcp_packet {
 struct tcp_connection {
   uint dst_addr;
   ushort dst_port;
-  uint seq_num;
-  uint ack_num;
+  uint seq_sent;
+  uint ack_sent;
+  uint seq_received;
+  uint ack_received;
 };
