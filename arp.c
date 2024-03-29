@@ -10,7 +10,7 @@
 
 struct { 
   struct spinlock lk;
-  arp_entry cache[ARP_CACHE_SIZE];
+  struct arp_entry cache[ARP_CACHE_SIZE];
 } arp_cache;
 
 void arpinit() {
@@ -58,7 +58,7 @@ int arp_search(uint ip) {
 }
 
 void arp_request(uint ip) {
-  arp_packet ap;
+  struct arp_packet ap;
   ap.hwd_type = htons(ARP_HTYPE_ETHERNET);
   ap.prot_type = htons(ETHERNET_TYPE_IP);
   ap.hwd_length = MAC_SIZE;
@@ -74,10 +74,10 @@ void arp_request(uint ip) {
 }
 
 void arp_reply(void *arp_pkt) {
-  arp_packet* req = (arp_packet*) arp_pkt;
+  struct arp_packet* req = (struct arp_packet*) arp_pkt;
   if(htonl(req->target_paddr) != MY_IP)
     return;
-  arp_packet rep;
+  struct arp_packet rep;
   rep.hwd_type = htons(ARP_HTYPE_ETHERNET);
   rep.prot_type = htons(ETHERNET_TYPE_IP);
   rep.hwd_length = MAC_SIZE;
@@ -161,7 +161,7 @@ void arp_add(uint ip, uchar *mac) {
 }
 
 void arp_receive(void *arp_pkt) {
-  arp_packet* ap = (arp_packet*) arp_pkt;
+  struct arp_packet *ap = (struct arp_packet*) arp_pkt;
   if(htons(ap->op) == ARP_OP_REQUEST)
     arp_reply(arp_pkt);
 

@@ -15,13 +15,11 @@ struct arp_packet {
   uint target_paddr;
 } __attribute__ ((packed));
 
-typedef struct arp_packet arp_packet;
-
 enum entry_status {EMPTY, USED, REQUESTED};
 
-typedef struct arp_entry {
+struct arp_entry {
   uint ip;
   uchar mac[HADDR_SIZE];
   uint valid_until;
   enum entry_status status;
-} arp_entry;
+};

@@ -13,7 +13,7 @@
   current header size is 20bytes i.e IHL(Internet Header Length) is 5
 */
 
-typedef struct ip_header {
+struct ip_header {
   uchar version_ihl;              // 4 bits for version, 4 bits for Internet Header Length (IHL)
   uchar tos;                      // Type of Service
   ushort tlen;                    // Total length of the IP packet (header + data)
@@ -24,9 +24,9 @@ typedef struct ip_header {
   ushort checksum;                // Header checksum
   uint src_ip;                    // Source IP address
   uint dst_ip;                    // Destination IP address
-} ip_header;
+};
 
-typedef struct ip_packet {
-    ip_header ip_hdr;
-    uchar transport_payload[MAX_TRANSPORT_PAYLOAD_SIZE];
-} ip_packet;
+struct ip_packet {
+  struct ip_header ip_hdr;
+  uchar transport_payload[MAX_TRANSPORT_PAYLOAD_SIZE];
+};

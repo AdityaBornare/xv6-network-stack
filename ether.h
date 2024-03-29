@@ -6,11 +6,11 @@
 #define ETHERNET_PAYLOAD_SIZE_MAX (ETHERNET_FRAME_SIZE_MAX - (ETHERNET_HDR_SIZE + ETHERNET_TRL_SIZE))
 #define MAC_SIZE 6
 
-typedef struct {
+struct ether_hdr {
   uchar dst[MAC_SIZE];
   uchar src[MAC_SIZE];
   ushort type;
-} ether_hdr;
+};
 
 // Ethernet type
 #define ETHERNET_TYPE_IP   0x0800

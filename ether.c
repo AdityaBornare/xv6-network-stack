@@ -12,13 +12,13 @@ void ether_send(uchar* destMAC, ushort type, void* payload, uint plen) {
     cprintf("maximum payload size exceeded!\n");
     return;
   }
-  ether_hdr *header;
+  struct ether_hdr *header;
   uint flen;
 
   // cprintf("size of payload : %d\n", plen);
   uchar frame[ETHERNET_FRAME_SIZE_MAX];
 
-  header = (ether_hdr*)frame;
+  header = (struct ether_hdr*)frame;
 
   // Set destination MAC address
   // Example: b0:dc:ef:bf:be:4f
@@ -44,7 +44,7 @@ void ether_send(uchar* destMAC, ushort type, void* payload, uint plen) {
 
 // extract playload from ethernet frame, pkt_size = frame_size - 4  (exclude CRC)
 void ether_receive(void *eth_frame, int pkt_size) {
-  ether_hdr *header = (ether_hdr*) eth_frame;
+  struct ether_hdr *header = (struct ether_hdr*) eth_frame;
   char *payload = (char*) (header + 1);
   ushort type = htons(header->type);
   switch (type) {

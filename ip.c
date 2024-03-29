@@ -17,7 +17,7 @@ void ip_init() {
 
 void ip_receive(void* ip_dgram, int dsize, uchar *rx_mac) {
   // extract the network layer packet from the Ethernet frame
-  ip_packet* rx_pkt = (ip_packet*) ip_dgram;
+  struct ip_packet *rx_pkt = (struct ip_packet*) ip_dgram;
 
   // header checks
   if ((rx_pkt->ip_hdr.version_ihl >> 4) != IP_VERSION_4) {
@@ -62,7 +62,7 @@ void ip_receive(void* ip_dgram, int dsize, uchar *rx_mac) {
 }
 
 void ip_send(uchar protocol, void* buffer, uint src_ip, uint dst_ip, int size) {
-  ip_packet pkt;
+  struct ip_packet pkt;
   pkt.ip_hdr.version_ihl = (4 << 4) | MINIMUM_IHL;
   pkt.ip_hdr.tos = 0;
   pkt.ip_hdr.tlen = htons(IP_HDR_SIZE + size);
