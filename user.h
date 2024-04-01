@@ -25,7 +25,7 @@ int sleep(int);
 int uptime(void);
 void ifset(uint, uint, uint);
 void ifconfig();
-void socket();
+void socket(int type);
 void bind();
 void listen();
 void connect();
@@ -48,3 +48,6 @@ int atoi(const char*);
 
 // unet.c
 uint inet_addr(char*);
+
+// types and enums
+enum socket_type { SOCK_STREAM };

@@ -1,4 +1,4 @@
-enum socket_type {TCP};
+enum socket_type { TCP };
 
 struct socket {
   uint addr;
