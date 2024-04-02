@@ -23,6 +23,7 @@ OBJS = \
 	proc.o\
 	rtl8139.o\
 	sleeplock.o\
+	socket.o\
 	spinlock.o\
 	string.o\
 	swtch.o\
@@ -189,6 +190,7 @@ UPROGS=\
 	_mkdir\
 	_rm\
 	_sh\
+	_socktest\
 	_stressfs\
 	_test\
 	_usertests\

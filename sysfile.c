@@ -35,23 +35,6 @@ argfd(int n, int *pfd, struct file **pf)
   return 0;
 }
 
-// Allocate a file descriptor for the given file.
-// Takes over file reference from caller on success.
-static int
-fdalloc(struct file *f)
-{
-  int fd;
-  struct proc *curproc = myproc();
-
-  for(fd = 0; fd < NOFILE; fd++){
-    if(curproc->ofile[fd] == 0){
-      curproc->ofile[fd] = f;
-      return fd;
-    }
-  }
-  return -1;
-}
-
 int
 sys_dup(void)
 {

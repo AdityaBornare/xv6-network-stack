@@ -31,7 +31,7 @@ sys_ifconfig(void)
 int
 sys_socket(void)
 {
-  return 0;
+  return socket();
 }
 
 int

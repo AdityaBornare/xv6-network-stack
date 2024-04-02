@@ -9,6 +9,8 @@
 #include "spinlock.h"
 #include "sleeplock.h"
 #include "file.h"
+#include "mmu.h"
+#include "proc.h"
 
 struct devsw devsw[NDEV];
 struct {
@@ -38,6 +40,22 @@ filealloc(void)
   }
   release(&ftable.lock);
   return 0;
+}
+
+// Allocate a file descriptor for the given file.
+// Takes over file reference from caller on success.
+int fdalloc(struct file *f)
+{
+  int fd;
+  struct proc *curproc = myproc();
+
+  for(fd = 0; fd < NOFILE; fd++){
+    if(curproc->ofile[fd] == 0){
+      curproc->ofile[fd] = f;
+      return fd;
+    }
+  }
+  return -1;
 }
 
 // Increment ref count for file f.

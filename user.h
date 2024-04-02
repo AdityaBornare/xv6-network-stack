@@ -25,7 +25,7 @@ int sleep(int);
 int uptime(void);
 void ifset(uint, uint, uint);
 void ifconfig();
-void socket(int type);
+int socket(int type);
 void bind();
 void listen();
 void connect();
