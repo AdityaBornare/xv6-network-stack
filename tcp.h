@@ -22,6 +22,16 @@ struct tcp_hdr {
   ushort urgent_ptr;      // Urgent pointer
 };
 
+// TCP connection states
+enum tcp_ca_state
+{
+  TCP_CA_Open = 0,
+  TCP_CA_Disorder = 1,
+  TCP_CA_CWR = 2,
+  TCP_CA_Recovery = 3,
+  TCP_CA_Loss = 4
+};
+
 // TCP packet structure (header + data)
 struct tcp_packet {
   struct tcp_hdr header;  // TCP header
@@ -36,4 +46,6 @@ struct tcp_connection {
   uint ack_sent;
   uint seq_received;
   uint ack_received;
+  ushort max_seg_size;
+  ushort win_size;
 };
