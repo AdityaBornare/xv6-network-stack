@@ -183,7 +183,9 @@ int             holdingsleep(struct sleeplock*);
 void            initsleeplock(struct sleeplock*, char*);
 
 // socket.c
+void            socketinit();
 int             socket();
+int             bind(int sockfd, uint addr, ushort port);
 
 // string.c
 int             memcmp(const void*, const void*, uint);

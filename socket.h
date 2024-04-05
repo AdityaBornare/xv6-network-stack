@@ -1,6 +1,6 @@
 struct socket {
   uint addr;
-  ushort src_port;
+  ushort port;
   enum { TCP } type;
   struct tcp_connection tcon;
 };

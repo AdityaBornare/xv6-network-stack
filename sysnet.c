@@ -6,9 +6,8 @@ sys_ifset(void)
 {
   int ip, netmask, gateway;
 
-  argint(0, &ip);
-  argint(1, &netmask);
-  argint(2, &gateway);
+  if(argint(0, &ip) < 0 || argint(1, &netmask) < 0 || argint(2, &gateway) < 0)
+    return -1;
 
   MY_IP = ip;
   NETMASK = netmask;
@@ -37,7 +36,14 @@ sys_socket(void)
 int
 sys_bind(void)
 {
-  return 0;
+  int sockfd;
+  uint addr;
+  ushort port;
+
+  if(argint(0, (int*)&sockfd) < 0 || argint(1, (int*)&addr) < 0 || argint(2, (int*)&port) < 0)
+    return -1;
+  cprintf("%x %x %x\n", sockfd, addr, port);
+  return bind(sockfd, addr, port);
 }
 
 int
