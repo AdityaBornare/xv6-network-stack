@@ -4,11 +4,10 @@
 int
 sys_ifset(void)
 {
-  int ip, netmask, gateway;
+  uint ip, netmask, gateway;
 
-  if(argint(0, &ip) < 0 || argint(1, &netmask) < 0 || argint(2, &gateway) < 0)
+  if(argint(0, (int*)&ip) < 0 || argint(1, (int*)&netmask) < 0 || argint(2, (int*)&gateway) < 0)
     return -1;
-
   MY_IP = ip;
   NETMASK = netmask;
   GATEWAY = gateway;
@@ -30,7 +29,10 @@ sys_ifconfig(void)
 int
 sys_socket(void)
 {
-  return socket();
+  int type;
+  if(argint(0, &type) < 0)
+    return -1;
+  return socket(type);
 }
 
 int
@@ -38,11 +40,10 @@ sys_bind(void)
 {
   int sockfd;
   uint addr;
-  ushort port;
+  int port;
 
-  if(argint(0, (int*)&sockfd) < 0 || argint(1, (int*)&addr) < 0 || argint(2, (int*)&port) < 0)
+  if(argint(0, &sockfd) < 0 || argint(1, (int*)&addr) < 0 || argint(2, &port) < 0)
     return -1;
-  cprintf("%x %x %x\n", sockfd, addr, port);
   return bind(sockfd, addr, port);
 }
 
