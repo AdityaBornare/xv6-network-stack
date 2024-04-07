@@ -26,7 +26,7 @@ void tcp_send(ushort src_port, ushort dst_port, uint dst_ip, uint seq_num, uint 
   memmove(packet.data, data, data_size);
 
   // Calculate TCP header checksum
-  packet.header.checksum = 0; // Placeholder for checksum calculation
+  packet.header.checksum = checksum(&packet.header,sizeof(struct tcp_hdr));
 
   // Send packet using IP layer
   ip_send(IP_PROTOCOL_TCP, &packet, MY_IP, dst_ip, total_size);
