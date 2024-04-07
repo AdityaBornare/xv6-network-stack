@@ -100,5 +100,7 @@ sys_test(void)
     return -1;
 
   ip_send(6, (uchar*)payload, MY_IP, dst_ip, sizeof(payload));
+  tcp_send(8888, 8888, dst_ip, 1, 1, 0, 512, (void*)payload, sizeof(payload));
+
   return 0;
 }

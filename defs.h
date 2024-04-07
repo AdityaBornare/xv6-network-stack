@@ -205,7 +205,7 @@ int             fetchstr(uint, char**);
 void            syscall(void);
 
 // tcp.c
-void            tcp_send(ushort src_port, ushort dst_port, uint seq_num, uint ack_num, uchar flags, ushort window_size);
+void            tcp_send(ushort src_port, ushort dst_port, uint dst_ip, uint seq_num, uint ack_num, uchar flags, ushort window_size, void* data, int data_size);
 void            tcp_receive(void);
 
 // timer.c
