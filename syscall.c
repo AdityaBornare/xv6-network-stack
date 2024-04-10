@@ -105,10 +105,11 @@ extern int sys_write(void);
 extern int sys_uptime(void);
 extern int sys_ifset(void);
 extern int sys_ifconfig(void);
-extern int sys_socket (void);
-extern int sys_bind (void);
-extern int sys_listen (void);
-extern int sys_connect (void);
+extern int sys_socket(void);
+extern int sys_bind(void);
+extern int sys_listen(void);
+extern int sys_connect(void);
+extern int sys_accept(void);
 extern int sys_test(void);
 
 static int (*syscalls[])(void) = {
@@ -139,6 +140,7 @@ static int (*syscalls[])(void) = {
 [SYS_bind]    sys_bind,
 [SYS_listen]  sys_listen,
 [SYS_connect] sys_connect,
+[SYS_accept]  sys_accept,
 [SYS_test]    sys_test,
 };
 

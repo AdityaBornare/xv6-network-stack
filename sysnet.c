@@ -40,9 +40,9 @@ sys_bind(void)
 {
   int sockfd;
   uint addr;
-  int port;
+  uint port;
 
-  if(argint(0, &sockfd) < 0 || argint(1, (int*)&addr) < 0 || argint(2, &port) < 0)
+  if(argint(0, &sockfd) < 0 || argint(1, (int*)&addr) < 0 || argint(2, (int*)&port) < 0)
     return -1;
   return bind(sockfd, addr, port);
 }
@@ -59,6 +59,20 @@ sys_listen(void)
 int
 sys_connect(void)
 {
-  return 0;
+  int sockfd;
+  uint dst_addr;
+  uint dst_port;
+
+  if(argint(0, &sockfd) < 0 || argint(1, (int*)&dst_addr) < 0 || argint(2, (int*)&dst_port) < 0)
+    return -1;
+  return connect(sockfd, dst_addr, dst_port);
 }
 
+int
+sys_accept(void)
+{
+  int sockfd;
+  if(argint(0, &sockfd) < 0)
+    return -1;
+  return accept(sockfd);
+}

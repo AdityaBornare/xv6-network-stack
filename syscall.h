@@ -26,4 +26,5 @@
 #define SYS_bind 25
 #define SYS_listen 26
 #define SYS_connect 27
-#define SYS_test   28
+#define SYS_accept 28
+#define SYS_test   29

@@ -187,6 +187,8 @@ void            socketinit();
 int             socket();
 int             bind(int sockfd, uint addr, ushort port);
 int             listen(int sockfd);
+int             connect(int sockfd, uint dst_addr, ushort port);
+int             accept(int sockfd);
 
 // string.c
 int             memcmp(const void*, const void*, uint);
@@ -206,7 +208,7 @@ int             fetchstr(uint, char**);
 void            syscall(void);
 
 // tcp.c
-void            tcp_send(ushort src_port, ushort dst_port, uint dst_ip, uint seq_num, uint ack_num, uchar flags, ushort window_size, void* data, int data_size);
+void            tcp_send(ushort src_port, ushort dst_port, uint dst_ip, uint seq_num, uint ack_num, uchar flags, uchar hdr_size, void* data, int data_size);
 void            tcp_receive(void);
 
 // timer.c

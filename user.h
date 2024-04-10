@@ -28,7 +28,8 @@ void ifconfig();
 int socket(int);
 int bind(int, uint, ushort);
 int listen(int);
-void connect();
+int connect(int sockfd, uint dst_addr, ushort dst_port);
+int accept(int sockfd);
 int test(uint);
 
 

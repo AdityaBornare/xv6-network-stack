@@ -1,5 +1,8 @@
-#define TCP_HEADER_SIZE 20
+#define TCP_HEADER_MIN_SIZE 20
+#define TCP_HEADER_MAX_SIZE 60
 #define MAX_APPLICATION_PLAYLOAD_SIZE 1460
+#define MSS (TCP_HEADER_MIN_SIZE + MAX_APPLICATION_PLAYLOAD_SIZE)
+#define WINDOW_SIZE (MSS * 4)
 
 // TCP flags
 #define TCP_FLAG_FIN  0x01  
@@ -25,7 +28,7 @@ struct tcp_hdr {
 // TCP packet structure (header + data)
 struct tcp_packet {
   struct tcp_hdr header;  // TCP header
-  uchar data[];           // Data field (variable length)
+  uchar options_data[];   // TCP options followed by data (variable length)
 };
 
 // TCP connection states
@@ -47,6 +50,6 @@ struct tcp_connection {
   uint ack_sent;
   uint seq_received;
   uint ack_received;
-  ushort max_seg_size;
-  ushort win_size;
+  ushort dst_mss;
+  ushort dst_win_size;
 };

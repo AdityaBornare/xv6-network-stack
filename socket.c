@@ -89,3 +89,51 @@ int listen(int sockfd) {
   socket->status |= SOCKET_LISTENING;
   return 0;
 }
+
+int connect(int sockfd, uint dst_addr, ushort dst_port) {
+  struct file *sockfile;
+  struct socket *socket;
+
+  if(sockfd < 0 || sockfd >= NOFILE || (sockfile = myproc()->ofile[sockfd]) == 0)
+    return -1;
+
+  if(sockfile->type != FD_SOCKET || (socket = sockfile->socket) == 0)
+    return -1;
+
+  // search for a free port and assign port and addr (MYIP)
+  // set SOCKET_BOUND bit in status
+  // send tcp connection request to given address, store info in tcon
+  // wait for reply (sleep)
+  // find reply at the start at buffer
+  // store info from reply in tcon
+  // send ack
+  // set SOCKET_CONNECTED bit in status
+  return 0;
+}
+
+int accept(int sockfd) {
+  struct file *sockfile;
+  struct socket *socket;
+
+  if(sockfd < 0 || sockfd >= NOFILE || (sockfile = myproc()->ofile[sockfd]) == 0)
+    return -1;
+
+  if(sockfile->type != FD_SOCKET || (socket = sockfile->socket) == 0)
+    return -1;
+  
+  if((socket->status & SOCKET_BOUND) == 0 || (socket->status & SOCKET_LISTENING) == 0)
+    return -1;
+
+  // check waitqueue for pending requests 
+  // sleep if no waitqueue empty
+  // dequeue the requests on FIFO basis
+  // save info from request to tcon
+  // send syn ack, update tcon
+  // wait for reply (sleep)
+  // find reply in buffer, extract, update tcon
+  // allocate new fd - refer socket syscall
+  // bind new struct socket to same address and port as sockfd
+  // set SOCKET_BOUND and SOCNET_CONNECTED in status of new fd
+  // return new fd
+  return 0;
+}
