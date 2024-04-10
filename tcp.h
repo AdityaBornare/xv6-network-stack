@@ -1,5 +1,5 @@
-#include "types.h"
-#include "defs.h"
+#define TCP_HEADER_SIZE 20
+#define MAX_APPLICATION_PLAYLOAD_SIZE 1460
 
 // TCP flags
 #define TCP_FLAG_FIN  0x01  
@@ -22,6 +22,12 @@ struct tcp_hdr {
   ushort urgent_ptr;      // Urgent pointer
 };
 
+// TCP packet structure (header + data)
+struct tcp_packet {
+  struct tcp_hdr header;  // TCP header
+  uchar data[];           // Data field (variable length)
+};
+
 // TCP connection states
 enum tcp_ca_state
 {
@@ -32,11 +38,6 @@ enum tcp_ca_state
   TCP_CA_Loss = 4
 };
 
-// TCP packet structure (header + data)
-struct tcp_packet {
-  struct tcp_hdr header;  // TCP header
-  uchar data[];           // Data field (variable length)
-};
 
 // TCP connection
 struct tcp_connection {

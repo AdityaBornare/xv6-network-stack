@@ -50,7 +50,10 @@ sys_bind(void)
 int
 sys_listen(void)
 {
-  return 0;
+  int sockfd;
+  if(argint(0, &sockfd) < 0)
+    return -1;
+  return listen(sockfd);
 }
 
 int

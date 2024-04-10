@@ -27,7 +27,7 @@ void ifset(uint, uint, uint);
 void ifconfig();
 int socket(int);
 int bind(int, uint, ushort);
-void listen();
+int listen(int);
 void connect();
 int test(uint);
 

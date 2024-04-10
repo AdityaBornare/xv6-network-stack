@@ -10,11 +10,15 @@
 #include "tcp.h"
 #include "socket.h"
 
-int ports[NPORTS];
+struct port {
+  int pid;
+  struct socket *socket;
+};
+struct port ports[NPORTS];
 
 void socketinit() {
   for(int i = 0; i < NPORTS; i++)
-    ports[i] = -1;
+    ports[i].pid = -1;
 }
 
 // returns fd on success, -1 on error
@@ -51,21 +55,37 @@ int bind(int sockfd, uint addr, ushort port) {
 
   if(port > NPORTS)
     return -1;
-  if(ports[port] != -1)
+  if(ports[port].pid != -1)
     return -1;
   if(addr != MY_IP)
     return -1;
   if(sockfd < 0 || sockfd >= NOFILE || (sockfile = myproc()->ofile[sockfd]) == 0)
     return -1;
 
-  if(sockfile->type != FD_SOCKET || sockfile->socket == 0) {
-    cprintf("%d %d\n", sockfile->type, FD_SOCKET);
+  if(sockfile->type != FD_SOCKET || (socket = sockfile->socket) == 0)
     return -1;
-  }
 
-  socket = sockfile->socket;
   socket->addr = addr;
   socket->port = port;
-  ports[port] = myproc()->pid;
+  ports[port].pid = myproc()->pid;
+  ports[port].socket = socket;
+  socket->status |= SOCKET_BOUND;
+  return 0;
+}
+
+int listen(int sockfd) {
+  struct file *sockfile;
+  struct socket *socket;
+
+  if(sockfd < 0 || sockfd >= NOFILE || (sockfile = myproc()->ofile[sockfd]) == 0)
+    return -1;
+
+  if(sockfile->type != FD_SOCKET || (socket = sockfile->socket) == 0)
+    return -1;
+
+  if((socket->status & SOCKET_BOUND) == 0)
+    return -1;
+
+  socket->status |= SOCKET_LISTENING;
   return 0;
 }
