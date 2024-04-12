@@ -9,6 +9,7 @@
 #include "proc.h"
 #include "tcp.h"
 #include "socket.h"
+#include "queue.h"
 
 struct port {
   int pid;
@@ -21,11 +22,13 @@ void socketinit() {
     ports[i].pid = -1;
 }
 
+
 // returns fd on success, -1 on error
 int socket(int type) {
   int fd;
   struct file *f;
   struct socket *s;
+
   if((s = (struct socket*)kalloc()) == 0) {
     return -1;
   }
@@ -67,6 +70,8 @@ int bind(int sockfd, uint addr, ushort port) {
 
   socket->addr = addr;
   socket->port = port;
+
+  initqueue(&(socket->waitqueue));
   ports[port].pid = myproc()->pid;
   ports[port].socket = socket;
   socket->status |= SOCKET_BOUND;
@@ -113,27 +118,71 @@ int connect(int sockfd, uint dst_addr, ushort dst_port) {
 
 int accept(int sockfd) {
   struct file *sockfile;
-  struct socket *socket;
+  struct socket *mysocket;
 
   if(sockfd < 0 || sockfd >= NOFILE || (sockfile = myproc()->ofile[sockfd]) == 0)
     return -1;
 
-  if(sockfile->type != FD_SOCKET || (socket = sockfile->socket) == 0)
+  if(sockfile->type != FD_SOCKET || (mysocket = sockfile->socket) == 0)
     return -1;
   
-  if((socket->status & SOCKET_BOUND) == 0 || (socket->status & SOCKET_LISTENING) == 0)
+  if((mysocket->status & SOCKET_BOUND) == 0 || (mysocket->status & SOCKET_LISTENING) == 0)
     return -1;
 
   // check waitqueue for pending requests 
   // sleep if no waitqueue empty
+  if(isqueueempty(mysocket->waitqueue))
+    wait(); // temporary to avoid logical error after if
+    // sleep();
+  
   // dequeue the requests on FIFO basis
   // save info from request to tcon
+  struct tcp_packet* tcp_req_packet = (struct tcp_packet*) dequeue(&(mysocket->waitqueue));
+
+  mysocket->tcon.dst_port = tcp_req_packet->header.dst_port;
+  mysocket->tcon.ack_received = tcp_req_packet->header.ack_num;
+  mysocket->tcon.seq_received = tcp_req_packet->header.seq_num;
+  // dest mss in tcp options
+  // mysocket->tcon.dst_mss = tcp_packet_request->options_data something;
+
   // send syn ack, update tcon
+  tcp_send(tcp_req_packet->header.dst_port,
+  tcp_req_packet->header.src_port,
+  dst_ip,
+  0,
+  tcp_req_packet->header.seq_num + 1,
+  tcp_req_packet->header.flags,
+  sizeof(tcp_req_packet->header),
+  tcp_req_packet->options_data,
+  data_size);
+
+  mysocket->tcon.dst_port = tcp_req_packet->header.dst_port;
+  mysocket->tcon.ack_sent = tcp_req_packet->header.ack_num;
+  mysocket->tcon.seq_sent = tcp_req_packet->header.seq_num;
+  
   // wait for reply (sleep)
+  // sleep();
+
+
   // find reply in buffer, extract, update tcon
+  struct tcp_packet* tcp_res_packet = (struct tcp_packet*) mysocket->buffer;
+  mysocket->tcon.dst_port = tcp_res_packet->header.dst_port;
+  mysocket->tcon.ack_received = tcp_res_packet->header.ack_num;
+  mysocket->tcon.seq_received = tcp_res_packet->header.seq_num;
+  
+  // wait for ack
+  // sleep();
+
   // allocate new fd - refer socket syscall
+  int newfd = socket(TCP);
+
   // bind new struct socket to same address and port as sockfd
+  bind(newfd,  sockfile->socket->addr, sockfile->socket->port);
+
   // set SOCKET_BOUND and SOCNET_CONNECTED in status of new fd
+  struct file *newfile = myproc()->ofile[newfd];
+  newfile->socket->status |= SOCKET_BOUND | SOCKET_CONNECTED;
+
   // return new fd
-  return 0;
+  return newfd;
 }

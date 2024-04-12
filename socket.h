@@ -11,7 +11,7 @@ struct socket {
   ushort port;
   enum { TCP } type;
   char status;
-  char waitqueue[MAX_WAITING_CLIENTS];
+  queue waitqueue;
   char buffer[MSS];
   struct tcp_connection tcon;
 };
