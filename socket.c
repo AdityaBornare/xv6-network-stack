@@ -152,7 +152,7 @@ int connect(int sockfd, uint dst_addr, ushort dst_port) {
   socket->tcon.seq_received = tcp_reply_packet->header.seq_num;
   
   // send ack
-  tcp_send(socket->port, socket->tcon.dst_port, dst_addr, socket->tcon.seq_received + 1, socket->tcon.ack_received, TCP_FLAG_ACK, sizeof(struct tcp_hdr), NULL, 0);
+  tcp_send(socket->port, socket->tcon.dst_port, dst_addr, socket->tcon.ack_received, socket->tcon.seq_received + 1, TCP_FLAG_ACK, sizeof(struct tcp_hdr), NULL, 0);
 
   // set SOCKET_CONNECTED bit in status
   socket->state = SOCKET_CONNECTED;
