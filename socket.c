@@ -10,15 +10,13 @@
 #include "tcp.h"
 #include "socket.h"
 
-struct port {
-  int pid;
-  struct socket *socket;
-};
 struct port ports[NPORTS];
+struct spinlock portlock;
 
-void socketinit() {
+void portinit() {
   for(int i = 0; i < NPORTS; i++)
     ports[i].pid = -1;
+  initlock(&portlock, "ports");
 }
 
 // returns fd on success, -1 on error
@@ -39,6 +37,7 @@ int socket(int type) {
 
   memset((void*)s, 0, sizeof(struct socket));
   s->type = type;
+  s->state = SOCKET_UNBOUND;
 
   f->type = FD_SOCKET;
   f->off = 0;
@@ -55,21 +54,25 @@ int bind(int sockfd, uint addr, ushort port) {
 
   if(port > NPORTS)
     return -1;
-  if(ports[port].pid != -1)
-    return -1;
   if(addr != MY_IP)
     return -1;
   if(sockfd < 0 || sockfd >= NOFILE || (sockfile = myproc()->ofile[sockfd]) == 0)
     return -1;
-
   if(sockfile->type != FD_SOCKET || (socket = sockfile->socket) == 0)
     return -1;
+  if(socket->state != SOCKET_UNBOUND)
+    return -1;
+  if(ports[port].pid != -1)
+    return -1;
+  
+  acquire(&portlock);
+  ports[port].pid = myproc()->pid;
+  ports[port].socket = socket;
+  release(&portlock);
 
   socket->addr = addr;
   socket->port = port;
-  ports[port].pid = myproc()->pid;
-  ports[port].socket = socket;
-  socket->status |= SOCKET_BOUND;
+  socket->state = SOCKET_BOUND;
   return 0;
 }
 
@@ -79,14 +82,12 @@ int listen(int sockfd) {
 
   if(sockfd < 0 || sockfd >= NOFILE || (sockfile = myproc()->ofile[sockfd]) == 0)
     return -1;
-
   if(sockfile->type != FD_SOCKET || (socket = sockfile->socket) == 0)
     return -1;
-
-  if((socket->status & SOCKET_BOUND) == 0)
+  if(socket->state != SOCKET_BOUND)
     return -1;
 
-  socket->status |= SOCKET_LISTENING;
+  socket->state = SOCKET_LISTENING;
   return 0;
 }
 

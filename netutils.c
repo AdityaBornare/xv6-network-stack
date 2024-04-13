@@ -4,7 +4,7 @@
 void netinit() {
   nicinit();
   arpinit();
-  socketinit();
+  portinit();
 }
 
 ushort htons(ushort n) {

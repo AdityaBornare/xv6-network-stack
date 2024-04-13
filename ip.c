@@ -46,19 +46,15 @@ void ip_receive(void* ip_dgram, int dsize, uchar *rx_mac) {
       icmp_receive(rx_pkt->transport_payload, dsize - IP_HDR_SIZE, htonl(rx_pkt->ip_hdr.src_ip));
       break;
 
+    case IP_PROTOCOL_TCP:
+      tcp_receive(rx_pkt->transport_payload, dsize - IP_HDR_SIZE, htonl(rx_pkt->ip_hdr.src_ip));
+
     default:
       char buf[dsize - IP_HDR_SIZE + 1];
       memmove(buf, rx_pkt->transport_payload, dsize - IP_HDR_SIZE);
       buf[dsize - IP_HDR_SIZE] = 0;
       cprintf("message = %s\n", buf);
-
-      // handle other protocols (TCP, UDP, etc.) as needed
   }
-  
-  // pass the transport payload to the transport layer (UDP/TCP)
-  // void* transport_payload = (void*)((uchar*)ip_dgram + (received_ip_hdr->version_ihl & 0x0F) * 4);
-
-  // the transport layer will handle the headers internally
 }
 
 void ip_send(uchar protocol, void* buffer, uint src_ip, uint dst_ip, int size) {
