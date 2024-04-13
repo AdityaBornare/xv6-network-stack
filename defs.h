@@ -9,7 +9,6 @@ struct spinlock;
 struct sleeplock;
 struct stat;
 struct superblock;
-
 // arp.c
 void            arpinit();
 uchar*          arp_resolve(uint ip);
@@ -183,7 +182,7 @@ int             holdingsleep(struct sleeplock*);
 void            initsleeplock(struct sleeplock*, char*);
 
 // socket.c
-void            socketinit();
+void            portinit();
 int             socket();
 int             bind(int sockfd, uint addr, ushort port);
 int             listen(int sockfd);
@@ -209,7 +208,7 @@ void            syscall(void);
 
 // tcp.c
 void            tcp_send(ushort src_port, ushort dst_port, uint dst_ip, uint seq_num, uint ack_num, uchar flags, uchar hdr_size, void* data, int data_size);
-void            tcp_receive(void);
+void            tcp_receive(void *tcp_segment, int size, uint dst_ip);
 
 // timer.c
 void            timerinit(void);

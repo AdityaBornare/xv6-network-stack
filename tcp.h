@@ -3,6 +3,7 @@
 #define MAX_APPLICATION_PLAYLOAD_SIZE 1460
 #define MSS (TCP_HEADER_MIN_SIZE + MAX_APPLICATION_PLAYLOAD_SIZE)
 #define WINDOW_SIZE (MSS * 4)
+#define MAX_PENDING_REQUESTS 20
 
 // TCP flags
 #define TCP_FLAG_FIN  0x01  
@@ -28,7 +29,7 @@ struct tcp_hdr {
 // TCP packet structure (header + data)
 struct tcp_packet {
   struct tcp_hdr header;  // TCP header
-  uchar options_data[];   // TCP options followed by data (variable length)
+  uchar options_data[MAX_APPLICATION_PLAYLOAD_SIZE];   // TCP options followed by data (variable length)
 };
 
 // TCP connection states
@@ -41,7 +42,6 @@ enum tcp_ca_state
   TCP_CA_Loss = 4
 };
 
-
 // TCP connection
 struct tcp_connection {
   uint dst_addr;
@@ -52,4 +52,9 @@ struct tcp_connection {
   uint ack_received;
   ushort dst_mss;
   ushort dst_win_size;
+};
+
+struct tcp_request {
+  uint client_ip;
+  struct tcp_packet request_packet;
 };
