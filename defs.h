@@ -4,11 +4,13 @@ struct file;
 struct inode;
 struct pipe;
 struct proc;
+struct queue;
 struct rtcdate;
 struct spinlock;
 struct sleeplock;
 struct stat;
 struct superblock;
+
 // arp.c
 void            arpinit();
 uchar*          arp_resolve(uint ip);
@@ -153,10 +155,18 @@ void            scheduler(void) __attribute__((noreturn));
 void            sched(void);
 void            setproc(struct proc*);
 void            sleep(void*, struct spinlock*);
+void            sleepnolock(void*);
 void            userinit(void);
 int             wait(void);
 void            wakeup(void*);
 void            yield(void);
+
+// queue.c
+void initqueue(struct queue *q);
+void enqueue(struct queue *q, int d);
+int dequeue(struct queue *q);
+int isqueuefull(struct queue q);
+int isqueueempty(struct queue q);
 
 // rtl8139.c
 void            rtl8139_send(void *packet, int length);

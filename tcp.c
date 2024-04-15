@@ -1,6 +1,6 @@
 #include "types.h"
 #include "defs.h"
-#include "stddef.h"
+#include "queue.h"
 #include "tcp.h"
 #include "socket.h"
 #include "ip.h"
@@ -11,7 +11,7 @@ struct tcp_request requests[MAX_PENDING_REQUESTS];
 
 void tcp_receive(void *tcp_segment, int size, uint dst_ip) {
   struct tcp_packet *rx_pkt = (struct tcp_packet*) tcp_segment;
-  ushort port = rx_pkt.header.dst_port;
+  ushort port = rx_pkt->header.dst_port;
   struct socket *soc;
   int i;
 
@@ -23,34 +23,38 @@ void tcp_receive(void *tcp_segment, int size, uint dst_ip) {
     return;
 
   if((rx_pkt->header.flags & TCP_FLAG_SYN) != 0) {
-    if(soc->state == SOCKET_LISTENING || soc->state == SOCKET_ACCPETING) {
+    if(soc->state == SOCKET_LISTENING || soc->state == SOCKET_ACCEPTING) {
       for(i = 0; i < MAX_PENDING_REQUESTS; i++) {
         if(requests[i].client_ip != 0) 
           break;
       }
       requests[i].client_ip = dst_ip;
-      memmove((void*) &requests[i].request_packet, tcp_segment, size);
-      // enqueue
+      memmove(&requests[i].request_packet, rx_pkt, size);
+      enqueue(&soc->waitqueue, (int) &requests[i].request_packet);
 
       if(soc->state == SOCKET_ACCEPTING)
-      // wakeup
+      wakeup(&ports[port]);
     }
 
-    else if(soc->state == SOCKET_CONNECTING && (rx_pkt->header.flags & TCP_FLAG_SYN) != 0) {
-      // add packet to buffer
-      // wakeup
+    else if(soc->state == SOCKET_CONNECTING && (rx_pkt->header.flags & TCP_FLAG_ACK) != 0) {
+      if(soc->tcon.dst_addr != dst_ip && soc->tcon.dst_port != rx_pkt->header.dst_port)
+        return;
+      memmove(soc->buffer, rx_pkt, size);
+      wakeup(&ports[port]);
     }
     return;
   }
 
-  if(soc->state == SOCKET_WAITING_FOR_ACK) {
-    // ??
-    // wakeup
+  if(soc->state == SOCKET_WAITING_FOR_ACK && (rx_pkt->header.flags & TCP_FLAG_ACK) != 0) {
+    if(soc->tcon.dst_addr != dst_ip && soc->tcon.dst_port != rx_pkt->header.dst_port)
+        return;
+    memmove(soc->buffer, rx_pkt, size);
+    wakeup(&ports[port]);
     return;
   }
 }
 
-void tcp_send(ushort src_port, ushort dst_port, uint dst_ip, uint seq_num, uint ack_num, uchar flags, uchar hdr_size,  void* data, int data_size) {
+void tcp_send(ushort src_port, ushort dst_port, uint dst_ip, uint seq_num, uint ack_num, uchar flags, uchar hdr_size, void* data, int data_size) {
   // Construct TCP packet
   struct tcp_packet packet;
   uint total_size = hdr_size + data_size;

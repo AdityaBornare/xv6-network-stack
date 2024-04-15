@@ -1,7 +1,6 @@
 #define TCP_HEADER_MIN_SIZE 20
 #define TCP_HEADER_MAX_SIZE 60
-#define MAX_APPLICATION_PLAYLOAD_SIZE 1460
-#define MSS (TCP_HEADER_MIN_SIZE + MAX_APPLICATION_PLAYLOAD_SIZE)
+#define MSS 1460
 #define WINDOW_SIZE (MSS * 4)
 #define MAX_PENDING_REQUESTS 20
 
@@ -29,7 +28,13 @@ struct tcp_hdr {
 // TCP packet structure (header + data)
 struct tcp_packet {
   struct tcp_hdr header;  // TCP header
-  uchar options_data[MAX_APPLICATION_PLAYLOAD_SIZE];   // TCP options followed by data (variable length)
+  uchar options_data[MSS];   // TCP options followed by data (variable length)
+};
+
+struct tcp_mss_option {
+  uchar kind;
+  uchar length;
+  ushort mss;
 };
 
 // TCP connection states

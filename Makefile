@@ -21,6 +21,7 @@ OBJS = \
 	picirq.o\
 	pipe.o\
 	proc.o\
+	queue.o\
 	rtl8139.o\
 	sleeplock.o\
 	socket.o\

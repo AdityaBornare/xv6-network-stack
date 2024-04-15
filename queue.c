@@ -2,15 +2,14 @@
 #include "defs.h"
 #include "queue.h"
 
-void initqueue(queue *q)
+void initqueue(struct queue *q)
 {
 	q->front = -1;
 	q->rear = -1;
-	q->size = max;
-	q->A = (int *)malloc(sizeof(int) * max);
+	q->size = QUEUE_SIZE;
 }
 
-void enqueue(queue *q, int d)
+void enqueue(struct queue *q, int d)
 {
 
 	if ((q->rear + 1) % q->size == q->front)
@@ -26,7 +25,7 @@ void enqueue(queue *q, int d)
 	q->A[q->rear] = d;
 	return;
 }
-int dequeue(queue *q)
+int dequeue(struct queue *q)
 {
 
 	int x = -1;
@@ -45,12 +44,12 @@ int dequeue(queue *q)
 	return x;
 }
 
-int isqueuefull(queue q)
+int isqueuefull(struct queue q)
 {
 	return ((q.rear + 1) % q.size == q.front);
 }
 
-int isqueueempty(queue q)
+int isqueueempty(struct queue q)
 {
 	return (q.front == -1);
 }

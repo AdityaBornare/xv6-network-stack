@@ -15,9 +15,9 @@ struct socket {
   uint addr;
   ushort port;
   enum { TCP } type;
-  queue waitqueue;
+  struct queue waitqueue;
   char state;
-  char buffer[MSS];
+  char *buffer;
   struct tcp_connection tcon;
 };
 

@@ -8,8 +8,8 @@
 #include "mmu.h"
 #include "proc.h"
 #include "tcp.h"
-#include "socket.h"
 #include "queue.h"
+#include "socket.h"
 
 struct port ports[NPORTS];
 struct spinlock portlock;
@@ -92,6 +92,7 @@ int listen(int sockfd) {
 
   initqueue(&(socket->waitqueue));
   socket->state = SOCKET_LISTENING;
+  socket->buffer = kalloc();
   return 0;
 }
 
@@ -126,63 +127,56 @@ int accept(int sockfd) {
   if(sockfile->type != FD_SOCKET || (mysocket = sockfile->socket) == 0)
     return -1;
   
-  if((mysocket->status & SOCKET_BOUND) == 0 || (mysocket->status & SOCKET_LISTENING) == 0)
+  if(mysocket->state != SOCKET_LISTENING)
     return -1;
 
-  // check waitqueue for pending requests 
-  // sleep if no waitqueue empty
-  if(isqueueempty(mysocket->waitqueue))
-    wait(); // temporary to avoid logical error after if
-    // sleep();
-  
-  // dequeue the requests on FIFO basis
-  // save info from request to tcon
-  struct tcp_packet* tcp_req_packet = (struct tcp_packet*) dequeue(&(mysocket->waitqueue));
+  if(isqueueempty(mysocket->waitqueue)) {
+    mysocket->state = SOCKET_ACCEPTING;
+    sleepnolock(&ports[mysocket->port]);
+  }
 
-  mysocket->tcon.dst_port = tcp_req_packet->header.dst_port;
+  mysocket->state = SOCKET_LISTENING;
+  struct tcp_request *request = (struct tcp_request*) dequeue(&(mysocket->waitqueue));
+  struct tcp_packet* tcp_req_packet = &request->request_packet;
+
+  mysocket->tcon.dst_addr = request->client_ip;
+  mysocket->tcon.dst_port = tcp_req_packet->header.src_port;
   mysocket->tcon.ack_received = tcp_req_packet->header.ack_num;
   mysocket->tcon.seq_received = tcp_req_packet->header.seq_num;
-  // dest mss in tcp options
-  // mysocket->tcon.dst_mss = tcp_packet_request->options_data something;
+
+  struct tcp_mss_option mss;
+  mss.kind = 2;
+  mss.length = 4;
+  mss.mss = MSS;
 
   // send syn ack, update tcon
-  tcp_send(tcp_req_packet->header.dst_port,
-  tcp_req_packet->header.src_port,
-  dst_ip,
-  0,
-  tcp_req_packet->header.seq_num + 1,
-  tcp_req_packet->header.flags,
-  sizeof(tcp_req_packet->header),
-  tcp_req_packet->options_data,
-  data_size);
+  tcp_send(
+    mysocket->port,
+    mysocket->tcon.dst_port,
+    mysocket->tcon.dst_addr,
+    0,
+    tcp_req_packet->header.seq_num + 1,
+    TCP_FLAG_SYN | TCP_FLAG_ACK,
+    TCP_HEADER_MIN_SIZE + mss.length,
+    &mss,
+    mss.length
+  );
 
-  mysocket->tcon.dst_port = tcp_req_packet->header.dst_port;
   mysocket->tcon.ack_sent = tcp_req_packet->header.ack_num;
   mysocket->tcon.seq_sent = tcp_req_packet->header.seq_num;
   
-  // wait for reply (sleep)
-  // sleep();
-
+  // wait for ack (sleep)
+  mysocket->state = SOCKET_WAITING_FOR_ACK;
+  sleepnolock(&ports[mysocket->port]);
 
   // find reply in buffer, extract, update tcon
   struct tcp_packet* tcp_res_packet = (struct tcp_packet*) mysocket->buffer;
-  mysocket->tcon.dst_port = tcp_res_packet->header.dst_port;
   mysocket->tcon.ack_received = tcp_res_packet->header.ack_num;
   mysocket->tcon.seq_received = tcp_res_packet->header.seq_num;
   
-  // wait for ack
-  // sleep();
-
-  // allocate new fd - refer socket syscall
   int newfd = socket(TCP);
-
-  // bind new struct socket to same address and port as sockfd
-  bind(newfd,  sockfile->socket->addr, sockfile->socket->port);
-
-  // set SOCKET_BOUND and SOCNET_CONNECTED in status of new fd
-  struct file *newfile = myproc()->ofile[newfd];
-  newfile->socket->status |= SOCKET_BOUND | SOCKET_CONNECTED;
-
-  // return new fd
+  bind(newfd,  mysocket->addr, mysocket->port);
+  myproc()->ofile[newfd]->socket->buffer = kalloc();
+  myproc()->ofile[newfd]->socket->state = SOCKET_CONNECTED;
   return newfd;
 }
