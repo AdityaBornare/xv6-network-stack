@@ -1,4 +1,5 @@
 #include "types.h"
+#include "stddef.h"
 #include "defs.h"
 #include "param.h"
 #include "spinlock.h"
@@ -107,13 +108,55 @@ int connect(int sockfd, uint dst_addr, ushort dst_port) {
     return -1;
 
   // search for a free port and assign port and addr (MYIP)
-  // set SOCKET_BOUND bit in status
+  int i;
+  for(i = 0; i < NPORTS; i++){
+    if(ports[i].pid == -1){
+      acquire(&portlock);
+      ports[i].pid = myproc()->pid;
+      ports[i].socket = socket;
+      release(&portlock);
+
+      // Assign the address (MYIP) to the socket
+      socket->addr = MY_IP;
+      // Assign the port to the socket
+      socket->port = i;
+      // Set the socket state to SOCKET_BOUND
+      socket->state = SOCKET_BOUND;
+       
+      break;
+    }
+  }
+  if(i == NPORTS){
+    // No free port available
+    return -1;
+  }
   // send tcp connection request to given address, store info in tcon
+  socket->tcon.dst_addr = dst_addr;
+  socket->tcon.dst_port = dst_port;
+  socket->tcon.seq_sent = 0;  // Initial sequence number
+  socket->tcon.ack_sent = 0;
+  socket->tcon.seq_received = 0;
+  socket->tcon.ack_received = 0;
+
+  tcp_send(socket->port, dst_port, dst_addr, 0, 0, TCP_FLAG_SYN, TCP_HEADER_MIN_SIZE, NULL, 0);
+  
   // wait for reply (sleep)
+  //sleep(); - TO DO
+  
   // find reply at the start at buffer
+  struct tcp_packet* tcp_reply_packet = (struct tcp_packet*)socket->buffer;
+
   // store info from reply in tcon
+  socket->tcon.dst_port = tcp_reply_packet->header.dst_port;
+  socket->tcon.ack_received = tcp_reply_packet->header.ack_num;
+  socket->tcon.seq_received = tcp_reply_packet->header.seq_num;
+  
   // send ack
+  tcp_send(socket->port, socket->tcon.dst_port, dst_addr, socket->tcon.ack_received, socket->tcon.seq_received + 1, TCP_FLAG_ACK, sizeof(struct tcp_hdr), NULL, 0);
+
   // set SOCKET_CONNECTED bit in status
+  socket->state = SOCKET_CONNECTED;
+  
   return 0;
 }
 
