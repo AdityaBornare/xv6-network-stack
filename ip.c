@@ -48,6 +48,7 @@ void ip_receive(void* ip_dgram, int dsize, uchar *rx_mac) {
 
     case IP_PROTOCOL_TCP:
       tcp_receive(rx_pkt->transport_payload, dsize - IP_HDR_SIZE, htonl(rx_pkt->ip_hdr.src_ip));
+      break;
 
     default:
       char buf[dsize - IP_HDR_SIZE + 1];

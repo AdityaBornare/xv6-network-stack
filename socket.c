@@ -1,5 +1,4 @@
 #include "types.h"
-#include "stddef.h"
 #include "defs.h"
 #include "param.h"
 #include "spinlock.h"
@@ -42,6 +41,7 @@ int socket(int type) {
   memset((void*)s, 0, sizeof(struct socket));
   s->type = type;
   s->state = SOCKET_UNBOUND;
+  s->buffer = kalloc();
 
   f->type = FD_SOCKET;
   f->off = 0;
@@ -93,7 +93,6 @@ int listen(int sockfd) {
 
   initqueue(&(socket->waitqueue));
   socket->state = SOCKET_LISTENING;
-  socket->buffer = kalloc();
   return 0;
 }
 
@@ -109,27 +108,28 @@ int connect(int sockfd, uint dst_addr, ushort dst_port) {
 
   // search for a free port and assign port and addr (MYIP)
   int i;
-  for(i = 0; i < NPORTS; i++){
-    if(ports[i].pid == -1){
-      acquire(&portlock);
+
+  acquire(&portlock);
+  for(i = 0; i < NPORTS; i++) {
+    if(ports[i].pid == -1) {
       ports[i].pid = myproc()->pid;
       ports[i].socket = socket;
-      release(&portlock);
-
       // Assign the address (MYIP) to the socket
       socket->addr = MY_IP;
       // Assign the port to the socket
       socket->port = i;
       // Set the socket state to SOCKET_BOUND
-      socket->state = SOCKET_BOUND;
-       
+      socket->state = SOCKET_BOUND; 
       break;
     }
   }
-  if(i == NPORTS){
+  release(&portlock);
+
+  if(i == NPORTS) {
     // No free port available
     return -1;
   }
+
   // send tcp connection request to given address, store info in tcon
   socket->tcon.dst_addr = dst_addr;
   socket->tcon.dst_port = dst_port;
@@ -138,25 +138,26 @@ int connect(int sockfd, uint dst_addr, ushort dst_port) {
   socket->tcon.seq_received = 0;
   socket->tcon.ack_received = 0;
 
-  tcp_send(socket->port, dst_port, dst_addr, 0, 0, TCP_FLAG_SYN, TCP_HEADER_MIN_SIZE, NULL, 0);
-  
-  // wait for reply (sleep)
-  //sleep(); - TO DO
-  
-  // find reply at the start at buffer
-  struct tcp_packet* tcp_reply_packet = (struct tcp_packet*)socket->buffer;
+  struct tcp_mss_option mss;
+  mss.kind = 2;
+  mss.length = 4;
+  mss.mss = htons(MSS);
 
-  // store info from reply in tcon
-  socket->tcon.dst_port = tcp_reply_packet->header.dst_port;
-  socket->tcon.ack_received = tcp_reply_packet->header.ack_num;
-  socket->tcon.seq_received = tcp_reply_packet->header.seq_num;
-  
+  tcp_send(socket->port, dst_port, dst_addr, 0, 0, TCP_FLAG_SYN, TCP_HEADER_MIN_SIZE + mss.length, &mss, mss.length);
+  socket->state = SOCKET_CONNECTING;
+
+  // wait for reply
+  sleepnolock(&ports[socket->port]);
+
+  struct tcp_packet* tcp_reply_packet = (struct tcp_packet*) socket->buffer;
+
+  socket->tcon.ack_received = htonl(tcp_reply_packet->header.ack_num);
+  socket->tcon.seq_received = htonl(tcp_reply_packet->header.seq_num);
+
   // send ack
-  tcp_send(socket->port, socket->tcon.dst_port, dst_addr, socket->tcon.ack_received, socket->tcon.seq_received + 1, TCP_FLAG_ACK, sizeof(struct tcp_hdr), NULL, 0);
+  tcp_send(socket->port, socket->tcon.dst_port, dst_addr, socket->tcon.ack_received, socket->tcon.seq_received + 1, TCP_FLAG_ACK, TCP_HEADER_MIN_SIZE, 0, 0);
 
-  // set SOCKET_CONNECTED bit in status
-  socket->state = SOCKET_CONNECTED;
-  
+  socket->state = SOCKET_CONNECTED; 
   return 0;
 }
 
@@ -181,16 +182,15 @@ int accept(int sockfd) {
   mysocket->state = SOCKET_LISTENING;
   struct tcp_request *request = (struct tcp_request*) dequeue(&(mysocket->waitqueue));
   struct tcp_packet* tcp_req_packet = &request->request_packet;
-
   mysocket->tcon.dst_addr = request->client_ip;
-  mysocket->tcon.dst_port = tcp_req_packet->header.src_port;
-  mysocket->tcon.ack_received = tcp_req_packet->header.ack_num;
-  mysocket->tcon.seq_received = tcp_req_packet->header.seq_num;
+  mysocket->tcon.dst_port = htons(tcp_req_packet->header.src_port);
+  mysocket->tcon.ack_received = htonl(tcp_req_packet->header.ack_num);
+  mysocket->tcon.seq_received = htonl(tcp_req_packet->header.seq_num);
 
   struct tcp_mss_option mss;
   mss.kind = 2;
   mss.length = 4;
-  mss.mss = MSS;
+  mss.mss = htons(MSS);
 
   // send syn ack, update tcon
   tcp_send(
@@ -198,15 +198,15 @@ int accept(int sockfd) {
     mysocket->tcon.dst_port,
     mysocket->tcon.dst_addr,
     0,
-    tcp_req_packet->header.seq_num + 1,
+    mysocket->tcon.seq_received + 1,
     TCP_FLAG_SYN | TCP_FLAG_ACK,
     TCP_HEADER_MIN_SIZE + mss.length,
     &mss,
     mss.length
   );
 
-  mysocket->tcon.ack_sent = tcp_req_packet->header.ack_num;
-  mysocket->tcon.seq_sent = tcp_req_packet->header.seq_num;
+  mysocket->tcon.ack_sent = mysocket->tcon.seq_received + 1;
+  mysocket->tcon.seq_sent = 0;
   
   // wait for ack (sleep)
   mysocket->state = SOCKET_WAITING_FOR_ACK;
@@ -214,12 +214,16 @@ int accept(int sockfd) {
 
   // find reply in buffer, extract, update tcon
   struct tcp_packet* tcp_res_packet = (struct tcp_packet*) mysocket->buffer;
-  mysocket->tcon.ack_received = tcp_res_packet->header.ack_num;
-  mysocket->tcon.seq_received = tcp_res_packet->header.seq_num;
+  mysocket->tcon.ack_received = htons(tcp_res_packet->header.ack_num);
+  mysocket->tcon.seq_received = htons(tcp_res_packet->header.seq_num);
   
   int newfd = socket(TCP);
   bind(newfd,  mysocket->addr, mysocket->port);
-  myproc()->ofile[newfd]->socket->buffer = kalloc();
-  myproc()->ofile[newfd]->socket->state = SOCKET_CONNECTED;
+  struct socket *new_socket = myproc()->ofile[newfd]->socket;
+  new_socket->buffer = kalloc();
+  new_socket->state = SOCKET_CONNECTED;
+  memset(&new_socket->tcon, 0, sizeof(struct tcp_connection));
+  new_socket->tcon.dst_addr = mysocket->tcon.dst_addr;
+  new_socket->tcon.dst_port = mysocket->tcon.dst_port;
   return newfd;
 }

@@ -11,7 +11,8 @@ struct tcp_request requests[MAX_PENDING_REQUESTS];
 
 void tcp_receive(void *tcp_segment, int size, uint dst_ip) {
   struct tcp_packet *rx_pkt = (struct tcp_packet*) tcp_segment;
-  ushort port = rx_pkt->header.dst_port;
+  ushort port = htons(rx_pkt->header.dst_port);
+  uchar flags = rx_pkt->header.flags;
   struct socket *soc;
   int i;
 
@@ -22,7 +23,7 @@ void tcp_receive(void *tcp_segment, int size, uint dst_ip) {
   if(soc->state == SOCKET_UNBOUND)
     return;
 
-  if((rx_pkt->header.flags & TCP_FLAG_SYN) != 0) {
+  if((flags & TCP_FLAG_SYN) != 0) {
     if(soc->state == SOCKET_LISTENING || soc->state == SOCKET_ACCEPTING) {
       for(i = 0; i < MAX_PENDING_REQUESTS; i++) {
         if(requests[i].client_ip != 0) 
@@ -30,14 +31,14 @@ void tcp_receive(void *tcp_segment, int size, uint dst_ip) {
       }
       requests[i].client_ip = dst_ip;
       memmove(&requests[i].request_packet, rx_pkt, size);
-      enqueue(&soc->waitqueue, (int) &requests[i].request_packet);
+      enqueue(&soc->waitqueue, (int) &requests[i]);
 
       if(soc->state == SOCKET_ACCEPTING)
       wakeup(&ports[port]);
     }
 
-    else if(soc->state == SOCKET_CONNECTING && (rx_pkt->header.flags & TCP_FLAG_ACK) != 0) {
-      if(soc->tcon.dst_addr != dst_ip && soc->tcon.dst_port != rx_pkt->header.dst_port)
+    else if(soc->state == SOCKET_CONNECTING && (flags & TCP_FLAG_ACK) != 0) {
+      if(soc->tcon.dst_addr != dst_ip || soc->tcon.dst_port != htons(rx_pkt->header.src_port))
         return;
       memmove(soc->buffer, rx_pkt, size);
       wakeup(&ports[port]);
@@ -45,8 +46,8 @@ void tcp_receive(void *tcp_segment, int size, uint dst_ip) {
     return;
   }
 
-  if(soc->state == SOCKET_WAITING_FOR_ACK && (rx_pkt->header.flags & TCP_FLAG_ACK) != 0) {
-    if(soc->tcon.dst_addr != dst_ip && soc->tcon.dst_port != rx_pkt->header.dst_port)
+  if(soc->state == SOCKET_WAITING_FOR_ACK && (flags & TCP_FLAG_ACK) != 0) {
+    if(soc->tcon.dst_addr != dst_ip || soc->tcon.dst_port != htons(rx_pkt->header.src_port))
         return;
     memmove(soc->buffer, rx_pkt, size);
     wakeup(&ports[port]);
@@ -65,6 +66,8 @@ void tcp_send(ushort src_port, ushort dst_port, uint dst_ip, uint seq_num, uint 
   packet.header.offset = (hdr_size >> 2) << 4;
   packet.header.flags = flags;
   packet.header.window_size = htons(WINDOW_SIZE);
+  packet.header.checksum = 0;
+  packet.header.urgent_ptr = 0;
 
   // Copy data into packet
   memmove(packet.options_data, data, data_size);

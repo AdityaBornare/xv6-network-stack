@@ -459,14 +459,14 @@ sleepnolock(void *chan) {
   if(p == 0)
     panic("sleep");
 
-  // Go to sleep.
+  acquire(&ptable.lock);
   p->chan = chan;
   p->state = SLEEPING;
 
   sched();
 
-  // Tidy up.
   p->chan = 0;
+  release(&ptable.lock);
 }
 
 //PAGEBREAK!

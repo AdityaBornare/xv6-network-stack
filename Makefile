@@ -191,8 +191,9 @@ UPROGS=\
 	_mkdir\
 	_rm\
 	_sh\
-	_socktest\
 	_stressfs\
+	_tcpclient\
+	_tcpserver\
 	_test\
 	_usertests\
 	_wc\

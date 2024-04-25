@@ -51,4 +51,4 @@ int atoi(const char*);
 uint inet_addr(char*);
 
 // types and enums
-enum socket_type { SOCK_STREAM };
+enum socket_type { TCP };
