@@ -14,12 +14,19 @@
 struct port ports[NPORTS];
 struct spinlock portlock;
 
+// socket array [NSOCKETS] - params.h
+// spinlock for socket array
+
+// void socketinit(); - initiate spinlock
+
 void portinit() {
   for(int i = 0; i < NPORTS; i++)
     ports[i].pid = -1;
   initlock(&portlock, "ports");
 }
 
+// socketalloc()
+// socketfree()
 
 // returns fd on success, -1 on error
 int socket(int type) {

@@ -2,6 +2,7 @@
 
 // socket states
 enum socket_states {
+  SOCKET_FREE,
   SOCKET_UNBOUND,
   SOCKET_BOUND,
   SOCKET_LISTENING,
