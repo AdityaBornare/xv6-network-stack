@@ -101,6 +101,7 @@ sys_test(void)
 
   ip_send(6, (uchar*)payload, MY_IP, dst_ip, sizeof(payload));
   tcp_send(8888, 8888, dst_ip, 1, 1, 0, 20, (void*)payload, sizeof(payload));
+  icmp_send_echo_request(dst_ip);
 
   return 0;
 }
