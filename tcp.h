@@ -37,18 +37,24 @@ struct tcp_mss_option {
   ushort mss;
 };
 
+struct tcp_request {
+  uint client_ip;
+  struct tcp_packet request_packet;
+};
+
 // TCP connection states
-enum tcp_ca_state
+enum tcp_connection_state
 {
-  TCP_CA_Open = 0,
-  TCP_CA_Disorder = 1,
-  TCP_CA_CWR = 2,
-  TCP_CA_Recovery = 3,
-  TCP_CA_Loss = 4
+  TCP_CLOSED,
+  TCP_LISTEN,
+  TCP_SYN_SENT,
+  TCP_SYNACK_SENT,
+  TCP_ESTABLISHED
 };
 
 // TCP connection
 struct tcp_connection {
+  int state;
   uint dst_addr;
   ushort dst_port;
   uint seq_sent;
@@ -59,7 +65,3 @@ struct tcp_connection {
   ushort dst_win_size;
 };
 
-struct tcp_request {
-  uint client_ip;
-  struct tcp_packet request_packet;
-};

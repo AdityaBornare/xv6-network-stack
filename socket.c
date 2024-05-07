@@ -61,7 +61,7 @@ int socket(int type) {
 // returns 0 on success, -1 on error
 int bind(int sockfd, uint addr, ushort port) {
   struct file *sockfile;
-  struct socket *socket;
+  struct socket *s;
 
   if(port > NPORTS)
     return -1;
@@ -69,37 +69,37 @@ int bind(int sockfd, uint addr, ushort port) {
     return -1;
   if(sockfd < 0 || sockfd >= NOFILE || (sockfile = myproc()->ofile[sockfd]) == 0)
     return -1;
-  if(sockfile->type != FD_SOCKET || (socket = sockfile->socket) == 0)
+  if(sockfile->type != FD_SOCKET || (s = sockfile->socket) == 0)
     return -1;
-  if(socket->state != SOCKET_UNBOUND)
+  if(s->state != SOCKET_UNBOUND)
     return -1;
   if(ports[port].pid != -1)
     return -1;
   
   acquire(&portlock);
   ports[port].pid = myproc()->pid;
-  ports[port].socket = socket;
+  ports[port].socket = s;
   release(&portlock);
 
-  socket->addr = addr;
-  socket->port = port;
-  socket->state = SOCKET_BOUND;
+  s->addr = addr;
+  s->port = port;
+  s->state = SOCKET_BOUND;
   return 0;
 }
 
 int listen(int sockfd) {
   struct file *sockfile;
-  struct socket *socket;
+  struct socket *s;
 
   if(sockfd < 0 || sockfd >= NOFILE || (sockfile = myproc()->ofile[sockfd]) == 0)
     return -1;
-  if(sockfile->type != FD_SOCKET || (socket = sockfile->socket) == 0)
+  if(sockfile->type != FD_SOCKET || (s = sockfile->socket) == 0)
     return -1;
-  if(socket->state != SOCKET_BOUND)
+  if(s->state != SOCKET_BOUND)
     return -1;
 
-  initqueue(&(socket->waitqueue));
-  socket->state = SOCKET_LISTENING;
+  initqueue(&(s->waitqueue));
+  s->tcon.state = TCP_LISTEN;
   return 0;
 }
 
@@ -151,7 +151,7 @@ int connect(int sockfd, uint dst_addr, ushort dst_port) {
   mss.mss = htons(MSS);
 
   tcp_send(socket->port, dst_port, dst_addr, 0, 0, TCP_FLAG_SYN, TCP_HEADER_MIN_SIZE + mss.length, &mss, mss.length);
-  socket->state = SOCKET_CONNECTING;
+  socket->tcon.state = TCP_SYN_SENT;
 
   // wait for reply
   sleepnolock(&ports[socket->port]);
@@ -164,35 +164,35 @@ int connect(int sockfd, uint dst_addr, ushort dst_port) {
   // send ack
   tcp_send(socket->port, socket->tcon.dst_port, dst_addr, socket->tcon.ack_received, socket->tcon.seq_received + 1, TCP_FLAG_ACK, TCP_HEADER_MIN_SIZE, 0, 0);
 
-  socket->state = SOCKET_CONNECTED; 
+  socket->tcon.state = TCP_ESTABLISHED; 
   return 0;
 }
 
 int accept(int sockfd) {
   struct file *sockfile;
-  struct socket *mysocket;
+  struct socket *s;
 
   if(sockfd < 0 || sockfd >= NOFILE || (sockfile = myproc()->ofile[sockfd]) == 0)
     return -1;
 
-  if(sockfile->type != FD_SOCKET || (mysocket = sockfile->socket) == 0)
+  if(sockfile->type != FD_SOCKET || (s = sockfile->socket) == 0)
     return -1;
   
-  if(mysocket->state != SOCKET_LISTENING)
+  if(s->tcon.state != TCP_LISTEN)
     return -1;
 
-  if(isqueueempty(mysocket->waitqueue)) {
-    mysocket->state = SOCKET_ACCEPTING;
-    sleepnolock(&ports[mysocket->port]);
+  if(isqueueempty(s->waitqueue)) {
+    s->state = SOCKET_WAIT;
+    sleepnolock(&ports[s->port]);
   }
 
-  mysocket->state = SOCKET_LISTENING;
-  struct tcp_request *request = (struct tcp_request*) dequeue(&(mysocket->waitqueue));
+  s->state = SOCKET_BOUND;
+  struct tcp_request *request = (struct tcp_request*) dequeue(&(s->waitqueue));
   struct tcp_packet* tcp_req_packet = &request->request_packet;
-  mysocket->tcon.dst_addr = request->client_ip;
-  mysocket->tcon.dst_port = htons(tcp_req_packet->header.src_port);
-  mysocket->tcon.ack_received = htonl(tcp_req_packet->header.ack_num);
-  mysocket->tcon.seq_received = htonl(tcp_req_packet->header.seq_num);
+  s->tcon.dst_addr = request->client_ip;
+  s->tcon.dst_port = htons(tcp_req_packet->header.src_port);
+  s->tcon.ack_received = htonl(tcp_req_packet->header.ack_num);
+  s->tcon.seq_received = htonl(tcp_req_packet->header.seq_num);
 
   struct tcp_mss_option mss;
   mss.kind = 2;
@@ -201,36 +201,36 @@ int accept(int sockfd) {
 
   // send syn ack, update tcon
   tcp_send(
-    mysocket->port,
-    mysocket->tcon.dst_port,
-    mysocket->tcon.dst_addr,
+    s->port,
+    s->tcon.dst_port,
+    s->tcon.dst_addr,
     0,
-    mysocket->tcon.seq_received + 1,
+    s->tcon.seq_received + 1,
     TCP_FLAG_SYN | TCP_FLAG_ACK,
     TCP_HEADER_MIN_SIZE + mss.length,
     &mss,
     mss.length
   );
 
-  mysocket->tcon.ack_sent = mysocket->tcon.seq_received + 1;
-  mysocket->tcon.seq_sent = 0;
+  s->tcon.ack_sent = s->tcon.seq_received + 1;
+  s->tcon.seq_sent = 0;
   
   // wait for ack (sleep)
-  mysocket->state = SOCKET_WAITING_FOR_ACK;
-  sleepnolock(&ports[mysocket->port]);
+  s->tcon.state = TCP_SYNACK_SENT;
+  sleepnolock(&ports[s->port]);
 
   // find reply in buffer, extract, update tcon
-  struct tcp_packet* tcp_res_packet = (struct tcp_packet*) mysocket->buffer;
-  mysocket->tcon.ack_received = htons(tcp_res_packet->header.ack_num);
-  mysocket->tcon.seq_received = htons(tcp_res_packet->header.seq_num);
+  struct tcp_packet* tcp_res_packet = (struct tcp_packet*) s->buffer;
+  s->tcon.ack_received = htons(tcp_res_packet->header.ack_num);
+  s->tcon.seq_received = htons(tcp_res_packet->header.seq_num);
   
   int newfd = socket(TCP);
-  bind(newfd,  mysocket->addr, mysocket->port);
+  bind(newfd,  s->addr, s->port);
   struct socket *new_socket = myproc()->ofile[newfd]->socket;
   new_socket->buffer = kalloc();
-  new_socket->state = SOCKET_CONNECTED;
+  new_socket->tcon.state = TCP_ESTABLISHED;
   memset(&new_socket->tcon, 0, sizeof(struct tcp_connection));
-  new_socket->tcon.dst_addr = mysocket->tcon.dst_addr;
-  new_socket->tcon.dst_port = mysocket->tcon.dst_port;
+  new_socket->tcon.dst_addr = s->tcon.dst_addr;
+  new_socket->tcon.dst_port = s->tcon.dst_port;
   return newfd;
 }

@@ -24,7 +24,7 @@ void tcp_receive(void *tcp_segment, int size, uint dst_ip) {
     return;
 
   if((flags & TCP_FLAG_SYN) != 0) {
-    if(soc->state == SOCKET_LISTENING || soc->state == SOCKET_ACCEPTING) {
+    if(soc->tcon.state == TCP_LISTEN) {
       for(i = 0; i < MAX_PENDING_REQUESTS; i++) {
         if(requests[i].client_ip != 0) 
           break;
@@ -33,11 +33,11 @@ void tcp_receive(void *tcp_segment, int size, uint dst_ip) {
       memmove(&requests[i].request_packet, rx_pkt, size);
       enqueue(&soc->waitqueue, (int) &requests[i]);
 
-      if(soc->state == SOCKET_ACCEPTING)
+      if(soc->state == SOCKET_WAIT)
       wakeup(&ports[port]);
     }
 
-    else if(soc->state == SOCKET_CONNECTING && (flags & TCP_FLAG_ACK) != 0) {
+    else if(soc->tcon.state == TCP_SYN_SENT && (flags & TCP_FLAG_ACK) != 0) {
       if(soc->tcon.dst_addr != dst_ip || soc->tcon.dst_port != htons(rx_pkt->header.src_port))
         return;
       memmove(soc->buffer, rx_pkt, size);
@@ -46,7 +46,7 @@ void tcp_receive(void *tcp_segment, int size, uint dst_ip) {
     return;
   }
 
-  if(soc->state == SOCKET_WAITING_FOR_ACK && (flags & TCP_FLAG_ACK) != 0) {
+  if(soc->tcon.state == TCP_SYNACK_SENT && (flags & TCP_FLAG_ACK) != 0) {
     if(soc->tcon.dst_addr != dst_ip || soc->tcon.dst_port != htons(rx_pkt->header.src_port))
         return;
     memmove(soc->buffer, rx_pkt, size);
