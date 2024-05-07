@@ -29,10 +29,8 @@ void tcp_receive(void *tcp_segment, int size, uint dst_ip) {
   pseudo_ip_sum += htons((ushort)IP_PROTOCOL_TCP);
   pseudo_ip_sum += htons(size);
 
-  if(checksum(rx_pkt, (rx_pkt->header.offset >> 4) << 2 , pseudo_ip_sum) != 0) {
-    cprintf("wrong checksum!\n");
+  if(checksum(rx_pkt, (rx_pkt->header.offset >> 4) << 2 , pseudo_ip_sum) != 0)
     return;
-  }
 
   if((flags & TCP_FLAG_SYN) != 0) {
     if(soc->tcon.state == TCP_LISTEN) {

@@ -43,11 +43,11 @@ void ip_receive(void* ip_dgram, int dsize, uchar *rx_mac) {
   switch (rx_pkt->ip_hdr.protocol) {
     case IP_PROTOCOL_ICMP:
       // if the protocol is ICMP, call the icmp_receive function
-      icmp_receive(rx_pkt->transport_payload, dsize - IP_HDR_SIZE, htonl(rx_pkt->ip_hdr.src_ip));
+      icmp_receive(rx_pkt->transport_payload, htons(rx_pkt->ip_hdr.tlen) - IP_HDR_SIZE, htonl(rx_pkt->ip_hdr.src_ip));
       break;
 
     case IP_PROTOCOL_TCP:
-      tcp_receive(rx_pkt->transport_payload, dsize - IP_HDR_SIZE, htonl(rx_pkt->ip_hdr.src_ip));
+      tcp_receive(rx_pkt->transport_payload, htons(rx_pkt->ip_hdr.tlen) - IP_HDR_SIZE, htonl(rx_pkt->ip_hdr.src_ip));
       break;
 
     default:
