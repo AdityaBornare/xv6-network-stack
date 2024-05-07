@@ -89,18 +89,3 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
-
-int
-sys_test(void)
-{
-  char payload[] = "test";
-  uint dst_ip;
-
-  if(argint(0, (int*)&dst_ip) < 0)
-    return -1;
-
-  ip_send(6, (uchar*)payload, MY_IP, dst_ip, sizeof(payload));
-  tcp_send(8888, 8888, dst_ip, 1, 1, 0, 20, (void*)payload, sizeof(payload));
-
-  return 0;
-}

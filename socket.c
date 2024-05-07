@@ -65,7 +65,7 @@ int bind(int sockfd, uint addr, ushort port) {
 
   if(port > NPORTS)
     return -1;
-  if(addr != MY_IP)
+  if(addr != MYIP)
     return -1;
   if(sockfd < 0 || sockfd >= NOFILE || (sockfile = myproc()->ofile[sockfd]) == 0)
     return -1;
@@ -122,7 +122,7 @@ int connect(int sockfd, uint dst_addr, ushort dst_port) {
       ports[i].pid = myproc()->pid;
       ports[i].socket = socket;
       // Assign the address (MYIP) to the socket
-      socket->addr = MY_IP;
+      socket->addr = MYIP;
       // Assign the port to the socket
       socket->port = i;
       // Set the socket state to SOCKET_BOUND
@@ -162,7 +162,7 @@ int connect(int sockfd, uint dst_addr, ushort dst_port) {
   socket->tcon.seq_received = htonl(tcp_reply_packet->header.seq_num);
 
   // send ack
-  tcp_send(socket->port, socket->tcon.dst_port, dst_addr, socket->tcon.ack_received, socket->tcon.seq_received + 1, TCP_FLAG_ACK, TCP_HEADER_MIN_SIZE, 0, 0);
+  tcp_send(socket->port, dst_port, dst_addr, socket->tcon.ack_received, socket->tcon.seq_received + 1, TCP_FLAG_ACK, TCP_HEADER_MIN_SIZE, 0, 0);
 
   socket->tcon.state = TCP_ESTABLISHED; 
   return 0;

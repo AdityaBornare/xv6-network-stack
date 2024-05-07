@@ -65,7 +65,7 @@ void arp_request(uint ip) {
   ap.prot_length = IP_ADDR_SIZE;
   ap.op = htons(ARP_OP_REQUEST);
   memmove(ap.sender_haddr, MAC, MAC_SIZE);
-  ap.sender_paddr = htonl(MY_IP);
+  ap.sender_paddr = htonl(MYIP);
   memset(ap.target_haddr, 0, MAC_SIZE);
   ap.target_paddr = htonl(ip);
 
@@ -75,7 +75,7 @@ void arp_request(uint ip) {
 
 void arp_reply(void *arp_pkt) {
   struct arp_packet* req = (struct arp_packet*) arp_pkt;
-  if(htonl(req->target_paddr) != MY_IP)
+  if(htonl(req->target_paddr) != MYIP)
     return;
   struct arp_packet rep;
   rep.hwd_type = htons(ARP_HTYPE_ETHERNET);
@@ -84,7 +84,7 @@ void arp_reply(void *arp_pkt) {
   rep.prot_length = IP_ADDR_SIZE;
   rep.op = htons(ARP_OP_REPLY);
   memmove(rep.sender_haddr, MAC, MAC_SIZE);
-  rep.sender_paddr = htonl(MY_IP);
+  rep.sender_paddr = htonl(MYIP);
   memmove(rep.target_haddr, req->sender_haddr, MAC_SIZE);
   rep.target_paddr = req->sender_paddr;
 
@@ -92,7 +92,7 @@ void arp_reply(void *arp_pkt) {
 }
 
 uchar *arp_resolve(uint ip) {
-  if((ip & NETMASK) != (MY_IP & NETMASK))
+  if((ip & NETMASK) != (MYIP & NETMASK))
     ip = GATEWAY;
   int i;
 

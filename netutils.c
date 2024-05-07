@@ -50,9 +50,9 @@ uint inet_addr(char ip_str[]) {
   return ip;
 }
 
-ushort checksum(void *data, int length) {
+ushort checksum(void *data, int length, uint start) {
   ushort *p = (ushort*) data;
-  uint sum = 0;
+  uint sum = start;
   while (length > 1) {
     sum += *p;
     sum = (sum >> 16) + (sum & 0xffff);

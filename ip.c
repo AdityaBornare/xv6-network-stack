@@ -5,7 +5,7 @@
 #define IP_VERSION_4 4
 
 ushort id = 0;
-uint MY_IP = 0xc0a80202;
+uint MYIP = 0xc0a80202;
 uint NETMASK = 0xffffff00;
 uint GATEWAY = 0xc0a80201;
 
@@ -29,13 +29,13 @@ void ip_receive(void* ip_dgram, int dsize, uchar *rx_mac) {
     return;
   }
   // validate checksum
-  if ((checksum(&rx_pkt->ip_hdr, IP_HDR_SIZE)) != 0) {
+  if ((checksum(&rx_pkt->ip_hdr, IP_HDR_SIZE, 0)) != 0) {
     cprintf("Invalid checksum\n");
     return;
   }
 
   // add ip - mac mapping into arp cache
-  if ((htonl(rx_pkt->ip_hdr.src_ip) & GATEWAY) == (MY_IP & GATEWAY)) {
+  if ((htonl(rx_pkt->ip_hdr.src_ip) & GATEWAY) == (MYIP & GATEWAY)) {
     arp_add(htonl(rx_pkt->ip_hdr.src_ip), rx_mac);
   }
 
@@ -70,7 +70,7 @@ void ip_send(uchar protocol, void* buffer, uint src_ip, uint dst_ip, int size) {
   pkt.ip_hdr.src_ip = htonl(src_ip);
   pkt.ip_hdr.dst_ip = htonl(dst_ip);
   pkt.ip_hdr.checksum = 0;
-  pkt.ip_hdr.checksum = checksum(&pkt.ip_hdr, IP_HDR_SIZE);
+  pkt.ip_hdr.checksum = checksum(&pkt.ip_hdr, IP_HDR_SIZE, 0);
   memmove(pkt.transport_payload, buffer, size);
 
   if (dst_ip == 0xffffffff) {

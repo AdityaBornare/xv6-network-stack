@@ -23,6 +23,17 @@ void tcp_receive(void *tcp_segment, int size, uint dst_ip) {
   if(soc->state == SOCKET_UNBOUND)
     return;
 
+  uint pseudo_ip_sum = 0;
+  pseudo_ip_sum += (MYIP & 0xffff) + ((MYIP >> 16) & 0xffff);
+  pseudo_ip_sum += (dst_ip & 0xffff) + ((dst_ip >> 16) & 0xffff);
+  pseudo_ip_sum += htons((ushort)IP_PROTOCOL_TCP);
+  pseudo_ip_sum += htons(size);
+
+  if(checksum(rx_pkt, (rx_pkt->header.offset >> 4) << 2 , pseudo_ip_sum) != 0) {
+    cprintf("wrong checksum!\n");
+    return;
+  }
+
   if((flags & TCP_FLAG_SYN) != 0) {
     if(soc->tcon.state == TCP_LISTEN) {
       for(i = 0; i < MAX_PENDING_REQUESTS; i++) {
@@ -73,10 +84,16 @@ void tcp_send(ushort src_port, ushort dst_port, uint dst_ip, uint seq_num, uint 
   memmove(packet.options_data, data, data_size);
 
   // Calculate TCP header checksum
-  packet.header.checksum = checksum(&packet.header,sizeof(struct tcp_hdr));
+  int pseudo_ip_sum = 0;
+  pseudo_ip_sum += (MYIP & 0xffff) + ((MYIP >> 16) & 0xffff);
+  pseudo_ip_sum += (dst_ip & 0xffff) + ((dst_ip >> 16) & 0xffff);
+  pseudo_ip_sum += htons((ushort)IP_PROTOCOL_TCP);
+  pseudo_ip_sum += htons((ushort)total_size);
+
+  packet.header.checksum = checksum(&packet.header, hdr_size, pseudo_ip_sum);
 
   // Send packet using IP layer
-  ip_send(IP_PROTOCOL_TCP, &packet, MY_IP, dst_ip, total_size);
+  ip_send(IP_PROTOCOL_TCP, &packet, MYIP, dst_ip, total_size);
 
   return;
 }

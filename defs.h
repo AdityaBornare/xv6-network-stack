@@ -84,7 +84,7 @@ extern uchar    ioapicid;
 void            ioapicinit(void);
 
 // ip.c
-extern uint     MY_IP;
+extern uint     MYIP;
 extern uint     NETMASK;
 extern uint     GATEWAY;
 void            ip_init();
@@ -124,7 +124,7 @@ void            netinit();
 ushort          htons(ushort n);
 uint            htonl(uint n);
 uint            inet_addr(char ip_str[]);
-ushort          checksum(void *data, int length);
+ushort          checksum(void *data, int length, uint start);
 
 // pci.c
 uint            read_pci_config_register(uchar bus, uchar device, uchar function, uchar offset);

@@ -40,8 +40,8 @@ void icmp_send_echo_reply(void* icmp_request_pkt, int pkt_size, uint source_ip) 
 
   // Recalculate ICMP checksum
   icmp_header->sum = 0;
-  icmp_header->sum = checksum((ushort*)icmp_header, size);
+  icmp_header->sum = checksum((ushort*)icmp_header, size, 0);
 
   // Send ICMP Echo Reply packet using IP layer
-  ip_send(IP_PROTOCOL_ICMP, buffer, MY_IP, source_ip, size);
+  ip_send(IP_PROTOCOL_ICMP, buffer, MYIP, source_ip, size);
 }

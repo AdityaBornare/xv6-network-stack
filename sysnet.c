@@ -8,7 +8,7 @@ sys_ifset(void)
 
   if(argint(0, (int*)&ip) < 0 || argint(1, (int*)&netmask) < 0 || argint(2, (int*)&gateway) < 0)
     return -1;
-  MY_IP = ip;
+  MYIP = ip;
   NETMASK = netmask;
   GATEWAY = gateway;
 
@@ -20,7 +20,7 @@ sys_ifset(void)
 int
 sys_ifconfig(void)
 {
-  cprintf("IP: %d.%d.%d.%d\n", (MY_IP >> 24) & 0xFF, (MY_IP >> 16) & 0xFF, (MY_IP >> 8) & 0xFF, MY_IP & 0xFF);
+  cprintf("IP: %d.%d.%d.%d\n", (MYIP >> 24) & 0xFF, (MYIP >> 16) & 0xFF, (MYIP >> 8) & 0xFF, MYIP & 0xFF);
   cprintf("Netmask: %d.%d.%d.%d\n", (NETMASK >> 24) & 0xFF, (NETMASK >> 16) & 0xFF, (NETMASK >> 8) & 0xFF, NETMASK & 0xFF);
   cprintf("Gateway: %d.%d.%d.%d\n", (GATEWAY >> 24) & 0xFF, (GATEWAY >> 16) & 0xFF, (GATEWAY >> 8) & 0xFF, GATEWAY & 0xFF);
   return 0;
@@ -76,3 +76,19 @@ sys_accept(void)
     return -1;
   return accept(sockfd);
 }
+
+int
+sys_test(void)
+{
+  char payload[] = "test";
+  uint dst_ip;
+
+  if(argint(0, (int*)&dst_ip) < 0)
+    return -1;
+
+  ip_send(6, (uchar*)payload, MYIP, dst_ip, sizeof(payload));
+  tcp_send(8888, 8888, dst_ip, 1, 1, 0, 20, (void*)payload, sizeof(payload));
+
+  return 0;
+}
+
