@@ -31,6 +31,8 @@ int listen(int);
 int connect(int sockfd, uint dst_addr, ushort dst_port);
 int accept(int sockfd);
 int test(uint);
+int get_icmp_echo_reply_status(void);
+int icmp_send_echo_request(uint dst_ip);
 
 
 // ulib.c

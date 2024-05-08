@@ -7,6 +7,8 @@
 #include "mmu.h"
 #include "proc.h"
 
+extern int icmp_echo_reply_received;
+
 int
 sys_fork(void)
 {
@@ -103,5 +105,25 @@ sys_test(void)
   tcp_send(8888, 8888, dst_ip, 1, 1, 0, 20, (void*)payload, sizeof(payload));
   icmp_send_echo_request(dst_ip);
 
+  return 0;
+}
+
+int
+sys_get_icmp_echo_reply_status(void)
+{
+  int status = icmp_echo_reply_received;
+  icmp_echo_reply_received = 0; // Reset the value
+  return status;
+}
+
+int
+sys_icmp_send_echo_request(void)
+{
+  uint dst_ip;
+
+  if (argint(0, (int*)&dst_ip) < 0)
+    return -1;
+
+  icmp_send_echo_request(dst_ip);
   return 0;
 }

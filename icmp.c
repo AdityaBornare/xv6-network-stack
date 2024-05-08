@@ -7,6 +7,8 @@
 #define ICMP_DATA_SIZE (ICMP_PACKET_SIZE - ICMP_HDR_SIZE)
 #define ICMP_PAYLOAD_PATTERN 'A'
 
+volatile int icmp_echo_reply_received = 0;  // Global variable to signal ICMP Echo Reply receipt
+
 void icmp_receive(void* icmp_pkt, int pkt_size, uint src_ip) {
   // Assuming icmp_pkt is a complete ICMP packet including the header
   icmp_hdr* icmp_header = (icmp_hdr*)icmp_pkt;
@@ -19,8 +21,9 @@ void icmp_receive(void* icmp_pkt, int pkt_size, uint src_ip) {
       break;
 
     case ICMP_TYPE_ECHOREPLY:
-      // Handle ICMP Echo Reply
-      cprintf("Received ICMP Echo Reply\n");
+      // Signal user space application about ICMP Echo Reply
+      cprintf("Reply received\n");
+      icmp_echo_reply_received = 1;
       break;
 
     // Add cases for other ICMP types as required in future

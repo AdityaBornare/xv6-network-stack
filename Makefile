@@ -190,6 +190,7 @@ UPROGS=\
 	_ls\
 	_mkdir\
 	_rm\
+  _ping_test\
 	_sh\
 	_stressfs\
 	_tcpclient\
