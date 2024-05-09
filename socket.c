@@ -14,19 +14,33 @@
 struct port ports[NPORTS];
 struct spinlock portlock;
 
-// socket array [NSOCKETS] - params.h
-// spinlock for socket array
+struct socket sockets[NSOCKETS];
+struct spinlock socklock;
 
-// void socketinit(); - initiate spinlock
+void socketinit(){
+  initlock(&socklock, "sockets");
+} 
 
 void portinit() {
+
   for(int i = 0; i < NPORTS; i++)
     ports[i].pid = -1;
   initlock(&portlock, "ports");
 }
 
-// socketalloc()
-// socketfree()
+struct socket* socketalloc(struct socket* s) {
+  
+  for(int i = 0; i < NSOCKETS; i++){
+    if(sockets[i].state == SOCKET_FREE){
+      return &sockets[i];
+    }
+  }
+  return 0;
+}
+void socketfree(struct socket* s) {
+  s->state = SOCKET_FREE;
+}
+
 
 // returns fd on success, -1 on error
 int socket(int type) {
@@ -34,14 +48,14 @@ int socket(int type) {
   struct file *f;
   struct socket *s;
 
-  if((s = (struct socket*)kalloc()) == 0) {
+  if(s = (socketalloc(s)) == 0) {
     return -1;
   }
 
   if((f = filealloc()) == 0 || (fd = fdalloc(f)) < 0){
     if(f)
       fileclose(f);
-    kfree((char*)s);
+    socketfree(s);
     return -1;
   }
 
