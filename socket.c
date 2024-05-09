@@ -35,6 +35,7 @@ struct socket* socketalloc(struct socket* s) {
       return &sockets[i];
     }
   }
+  return 0;
 }
 void socketfree(struct socket* s) {
   s->state = SOCKET_FREE;
@@ -47,14 +48,14 @@ int socket(int type) {
   struct file *f;
   struct socket *s;
 
-  if((s = (struct socket*)kalloc()) == 0) {
+  if(s = (socketalloc(s)) == 0) {
     return -1;
   }
 
   if((f = filealloc()) == 0 || (fd = fdalloc(f)) < 0){
     if(f)
       fileclose(f);
-    kfree((char*)s);
+    socketfree(s);
     return -1;
   }
 
