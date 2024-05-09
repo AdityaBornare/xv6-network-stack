@@ -17,24 +17,26 @@ struct spinlock portlock;
 struct socket sockets[NSOCKETS];
 struct spinlock socklock;
 
-void socketinit(){
+void socketinit() {
   initlock(&socklock, "sockets");
 } 
 
 void portinit() {
-
   for(int i = 0; i < NPORTS; i++)
     ports[i].pid = -1;
   initlock(&portlock, "ports");
 }
 
-struct socket* socketalloc(struct socket* s) {
-  
+struct socket* socketalloc() {
+  acquire(&socklock);
   for(int i = 0; i < NSOCKETS; i++){
-    if(sockets[i].state == SOCKET_FREE){
+    if(sockets[i].state == SOCKET_FREE) {    
+      sockets[i].state = SOCKET_UNBOUND;
+      release(&socklock);
       return &sockets[i];
     }
   }
+  release(&socklock);
   return 0;
 }
 void socketfree(struct socket* s) {
@@ -48,9 +50,8 @@ int socket(int type) {
   struct file *f;
   struct socket *s;
 
-  if(s = (socketalloc(s)) == 0) {
-    return -1;
-  }
+  if((s = socketalloc()) == 0)
+    return -1;  
 
   if((f = filealloc()) == 0 || (fd = fdalloc(f)) < 0){
     if(f)
@@ -61,7 +62,6 @@ int socket(int type) {
 
   memset((void*)s, 0, sizeof(struct socket));
   s->type = type;
-  s->state = SOCKET_UNBOUND;
   s->buffer = kalloc();
 
   f->type = FD_SOCKET;
@@ -248,3 +248,17 @@ int accept(int sockfd) {
   new_socket->tcon.dst_port = s->tcon.dst_port;
   return newfd;
 }
+
+// socketwrite(struct socket *s, char *data, int size) {
+//   check socket state
+//   if size < MSS --> single packet
+//   size // mss + 1 --> no of iterations
+//   size % MSS --> last iteration
+//   
+//   per itearation:
+//   tcp_send() 
+//     create new tcp packet
+//     add header fields (s->tcon)
+//   s->tcon --> update
+//
+// }

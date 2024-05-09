@@ -193,6 +193,7 @@ void            initsleeplock(struct sleeplock*, char*);
 
 // socket.c
 void            portinit();
+void            socketinit();
 int             socket();
 int             bind(int sockfd, uint addr, ushort port);
 int             listen(int sockfd);

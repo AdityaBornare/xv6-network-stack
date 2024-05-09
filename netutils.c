@@ -5,6 +5,7 @@ void netinit() {
   nicinit();
   arpinit();
   portinit();
+  socketinit();
 }
 
 ushort htons(ushort n) {

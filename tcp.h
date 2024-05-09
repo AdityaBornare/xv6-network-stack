@@ -58,6 +58,7 @@ struct tcp_connection {
   uint dst_addr;
   ushort dst_port;
   uint seq_sent;
+  uint next_seq;
   uint ack_sent;
   uint seq_received;
   uint ack_received;
