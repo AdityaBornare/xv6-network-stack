@@ -235,13 +235,13 @@ int accept(int sockfd) {
   struct tcp_packet* tcp_res_packet = (struct tcp_packet*) s->buffer;
   s->tcon.ack_received = htons(tcp_res_packet->header.ack_num);
   s->tcon.seq_received = htons(tcp_res_packet->header.seq_num);
+  s->tcon.state = TCP_LISTEN;
   
   int newfd = socket(TCP);
   bind(newfd,  s->addr, s->port);
   struct socket *new_socket = myproc()->ofile[newfd]->socket;
   new_socket->buffer = kalloc();
   new_socket->tcon.state = TCP_ESTABLISHED;
-  memset(&new_socket->tcon, 0, sizeof(struct tcp_connection));
   new_socket->tcon.dst_addr = s->tcon.dst_addr;
   new_socket->tcon.dst_port = s->tcon.dst_port;
   return newfd;
