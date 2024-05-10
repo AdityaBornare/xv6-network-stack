@@ -29,7 +29,7 @@ void tcp_receive(void *tcp_segment, int size, uint dst_ip) {
   pseudo_ip_sum += htons((ushort)IP_PROTOCOL_TCP);
   pseudo_ip_sum += htons(size);
 
-  if(checksum(rx_pkt, (rx_pkt->header.offset >> 4) << 2 , pseudo_ip_sum) != 0)
+  if(checksum(rx_pkt, size , pseudo_ip_sum) != 0)
     return;
 
   if((flags & TCP_FLAG_SYN) != 0) {
@@ -62,6 +62,22 @@ void tcp_receive(void *tcp_segment, int size, uint dst_ip) {
     wakeup(&ports[port]);
     return;
   }
+
+  if(soc->tcon.state == TCP_ESTABLISHED && (flags & TCP_FLAG_ACK) != 0) {
+    if(soc->tcon.dst_port != htons(rx_pkt->header.src_port))
+      return;
+    if(soc->tcon.ack_sent != htonl(rx_pkt->header.seq_num)) {
+      memmove(soc->buffer + soc->end, rx_pkt + (rx_pkt->header.offset >> 2), size - (rx_pkt->header.offset >> 2));
+      if(soc->state == SOCKET_WAIT)
+        wakeup(&ports[port]);
+      // send ack
+      soc->tcon.seq_received = htonl(rx_pkt->header.seq_num);
+      soc->tcon.ack_sent = soc->tcon.seq_received + size - (rx_pkt->header.offset >> 2);
+    }
+    else {
+      // send ack
+    }
+  }
 }
 
 void tcp_send(ushort src_port, ushort dst_port, uint dst_ip, uint seq_num, uint ack_num, uchar flags, uchar hdr_size, void* data, int data_size) {
@@ -88,7 +104,7 @@ void tcp_send(ushort src_port, ushort dst_port, uint dst_ip, uint seq_num, uint 
   pseudo_ip_sum += htons((ushort)IP_PROTOCOL_TCP);
   pseudo_ip_sum += htons((ushort)total_size);
 
-  packet.header.checksum = checksum(&packet.header, hdr_size, pseudo_ip_sum);
+  packet.header.checksum = checksum(&packet.header, total_size, pseudo_ip_sum);
 
   // Send packet using IP layer
   ip_send(IP_PROTOCOL_TCP, &packet, MYIP, dst_ip, total_size);

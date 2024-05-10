@@ -39,10 +39,10 @@ struct socket* socketalloc() {
   release(&socklock);
   return 0;
 }
+
 void socketfree(struct socket* s) {
   s->state = SOCKET_FREE;
 }
-
 
 // returns fd on success, -1 on error
 int socket(int type) {
@@ -60,7 +60,6 @@ int socket(int type) {
     return -1;
   }
 
-  memset((void*)s, 0, sizeof(struct socket));
   s->type = type;
   s->buffer = kalloc();
 
@@ -188,10 +187,9 @@ int accept(int sockfd) {
 
   if(sockfd < 0 || sockfd >= NOFILE || (sockfile = myproc()->ofile[sockfd]) == 0)
     return -1;
-
   if(sockfile->type != FD_SOCKET || (s = sockfile->socket) == 0)
-    return -1;
-  
+    return -1; 
+  cprintf("%d\n", sockfd);
   if(s->tcon.state != TCP_LISTEN)
     return -1;
 
@@ -262,3 +260,21 @@ int accept(int sockfd) {
 //   s->tcon --> update
 //
 // }
+
+int socketread(struct socket *s, void *dst, int size) {
+  if(s->tcon.state != TCP_ESTABLISHED)
+    return -1;
+  
+  if(s->offset == s->end) {
+    s->state = SOCKET_WAIT;
+    sleepnolock(&ports[s->port]);
+    s->state = SOCKET_BOUND;
+  }
+  int maxbytes = s->end - s->offset;
+  int bytes = maxbytes >= size ? size : maxbytes;
+
+  memmove(dst, s->buffer + s->offset, bytes);
+  s->offset += bytes;
+  return bytes;
+}
+
