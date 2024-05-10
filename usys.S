@@ -39,4 +39,5 @@ SYSCALL(accept)
 SYSCALL(test)
 SYSCALL(get_icmp_echo_reply_status)
 SYSCALL(icmp_send_echo_request)
+SYSCALL(get_icmp_echo_reply_packet)
 

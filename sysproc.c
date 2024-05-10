@@ -6,8 +6,10 @@
 #include "memlayout.h"
 #include "mmu.h"
 #include "proc.h"
+#include "icmp.h" 
 
 extern int icmp_echo_reply_received;
+extern struct icmp_reply_packet icmp_reply_pkt_info;
 
 int
 sys_fork(void)
@@ -103,7 +105,6 @@ sys_test(void)
 
   ip_send(6, (uchar*)payload, MY_IP, dst_ip, sizeof(payload));
   tcp_send(8888, 8888, dst_ip, 1, 1, 0, 20, (void*)payload, sizeof(payload));
-  icmp_send_echo_request(dst_ip);
 
   return 0;
 }
@@ -116,14 +117,27 @@ sys_get_icmp_echo_reply_status(void)
   return status;
 }
 
+int 
+sys_get_icmp_echo_reply_packet(void) {
+  int srcip = htonl(icmp_reply_pkt_info.src_ip);
+  cprintf("%d bytes from %d.%d.%d.%d: icmp_seq=%d ",icmp_reply_pkt_info.size,srcip & 0xFF,(srcip >> 8) & 0xFF,(srcip >> 16) & 0xFF,(srcip >> 24) & 0xFF,icmp_reply_pkt_info.seq_no);
+  return 0;
+}
+
+
+
 int
 sys_icmp_send_echo_request(void)
 {
   uint dst_ip;
+  uint seq_no;
 
   if (argint(0, (int*)&dst_ip) < 0)
     return -1;
+    
+  if (argint(1, (int*)&seq_no) < 0)
+    return -1;
 
-  icmp_send_echo_request(dst_ip);
+  icmp_send_echo_request(dst_ip, seq_no);
   return 0;
 }

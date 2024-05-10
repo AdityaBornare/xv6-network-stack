@@ -30,4 +30,5 @@
 #define SYS_test   29
 #define SYS_icmp_send_echo_request  30
 #define SYS_get_icmp_echo_reply_status  31
+#define SYS_get_icmp_echo_reply_packet  32
 

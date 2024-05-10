@@ -72,7 +72,7 @@ int             writei(struct inode*, char*, uint, uint);
 //icmp.c
 void icmp_receive(void* icmp_pkt, int pkt_size, uint src_ip);
 void icmp_send_echo_reply(void* icmp_request_pkt, int pkt_size, uint source_ip);
-void icmp_send_echo_request(uint dst_ip);
+void icmp_send_echo_request(uint dst_ip, ushort seq_no);
 
 // ide.c
 void            ideinit(void);
