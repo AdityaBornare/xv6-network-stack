@@ -91,7 +91,7 @@ int bind(int sockfd, uint addr, ushort port) {
   
   acquire(&portlock);
   ports[port].pid = myproc()->pid;
-  ports[port].socket = s;
+  ports[port].passive_socket = s;
   release(&portlock);
 
   s->addr = addr;
@@ -118,12 +118,12 @@ int listen(int sockfd) {
 
 int connect(int sockfd, uint dst_addr, ushort dst_port) {
   struct file *sockfile;
-  struct socket *socket;
+  struct socket *s;
 
   if(sockfd < 0 || sockfd >= NOFILE || (sockfile = myproc()->ofile[sockfd]) == 0)
     return -1;
 
-  if(sockfile->type != FD_SOCKET || (socket = sockfile->socket) == 0)
+  if(sockfile->type != FD_SOCKET || (s = sockfile->socket) == 0)
     return -1;
 
   // search for a free port and assign port and addr (MYIP)
@@ -133,13 +133,13 @@ int connect(int sockfd, uint dst_addr, ushort dst_port) {
   for(i = 0; i < NPORTS; i++) {
     if(ports[i].pid == -1) {
       ports[i].pid = myproc()->pid;
-      ports[i].socket = socket;
+      ports[i].active_socket = s;
       // Assign the address (MYIP) to the socket
-      socket->addr = MYIP;
+      s->addr = MYIP;
       // Assign the port to the socket
-      socket->port = i;
+      s->port = i;
       // Set the socket state to SOCKET_BOUND
-      socket->state = SOCKET_BOUND; 
+      s->state = SOCKET_BOUND; 
       break;
     }
   }
@@ -151,33 +151,29 @@ int connect(int sockfd, uint dst_addr, ushort dst_port) {
   }
 
   // send tcp connection request to given address, store info in tcon
-  socket->tcon.dst_addr = dst_addr;
-  socket->tcon.dst_port = dst_port;
-  socket->tcon.seq_sent = 0;  // Initial sequence number
-  socket->tcon.ack_sent = 0;
-  socket->tcon.seq_received = 0;
-  socket->tcon.ack_received = 0;
+  s->tcon.dst_addr = dst_addr;
+  s->tcon.dst_port = dst_port;
 
   struct tcp_mss_option mss;
   mss.kind = 2;
   mss.length = 4;
   mss.mss = htons(MSS);
 
-  tcp_send(socket->port, dst_port, dst_addr, 0, 0, TCP_FLAG_SYN, TCP_HEADER_MIN_SIZE + mss.length, &mss, mss.length);
-  socket->tcon.state = TCP_SYN_SENT;
+  tcp_send(s->port, dst_port, dst_addr, 0, 0, TCP_FLAG_SYN, TCP_HEADER_MIN_SIZE + mss.length, &mss, mss.length);
+  s->tcon.state = TCP_SYN_SENT;
 
   // wait for reply
-  sleepnolock(&ports[socket->port]);
+  sleepnolock(&ports[s->port]);
 
-  struct tcp_packet* tcp_reply_packet = (struct tcp_packet*) socket->buffer;
+  struct tcp_packet* tcp_reply_packet = (struct tcp_packet*) s->buffer;
 
-  socket->tcon.ack_received = htonl(tcp_reply_packet->header.ack_num);
-  socket->tcon.seq_received = htonl(tcp_reply_packet->header.seq_num);
+  s->tcon.ack_received = htonl(tcp_reply_packet->header.ack_num);
+  s->tcon.seq_received = htonl(tcp_reply_packet->header.seq_num);
 
   // send ack
-  tcp_send(socket->port, dst_port, dst_addr, socket->tcon.ack_received, socket->tcon.seq_received + 1, TCP_FLAG_ACK, TCP_HEADER_MIN_SIZE, 0, 0);
+  tcp_send(s->port, dst_port, dst_addr, s->tcon.ack_received, s->tcon.seq_received + 1, TCP_FLAG_ACK, TCP_HEADER_MIN_SIZE, 0, 0);
 
-  socket->tcon.state = TCP_ESTABLISHED; 
+  s->tcon.state = TCP_ESTABLISHED; 
   return 0;
 }
 
@@ -189,7 +185,6 @@ int accept(int sockfd) {
     return -1;
   if(sockfile->type != FD_SOCKET || (s = sockfile->socket) == 0)
     return -1; 
-  cprintf("%d\n", sockfd);
   if(s->tcon.state != TCP_LISTEN)
     return -1;
 
@@ -238,54 +233,54 @@ int accept(int sockfd) {
   s->tcon.state = TCP_LISTEN;
   
   int newfd = socket(TCP);
-  bind(newfd,  s->addr, s->port);
   struct socket *new_socket = myproc()->ofile[newfd]->socket;
-  new_socket->buffer = kalloc();
-  new_socket->tcon.state = TCP_ESTABLISHED;
+  ports[s->port].active_socket = new_socket;
+  new_socket->addr = s->addr;
+  new_socket->port = s->port;
+  new_socket->state = SOCKET_CONNECTED; 
   new_socket->tcon.dst_addr = s->tcon.dst_addr;
   new_socket->tcon.dst_port = s->tcon.dst_port;
+  new_socket->tcon.state = TCP_ESTABLISHED;
   return newfd;
 }
 
 int socketwrite(struct socket *s, char *payload, int payload_size) {
-
   // check socket state
   if(s->tcon.state != TCP_ESTABLISHED)
     return -1;
 
-  s->tcon.next_seq = 0;
-
-  for(int i = 0; i < payload_size/MSS + 1; i++){
+  for(int i = 0; i < payload_size/MSS + 1; i++) {
 
     int current_payload_size = MSS;
 
     if(i == payload_size/MSS)
       current_payload_size = payload_size % MSS;
-    
-    tcp_send(s->addr, // source port
-    s->tcon.dst_port,
-    s->tcon.dst_addr,
-    s->tcon.next_seq,
-    s->tcon.ack_received, // which acknowledgement
-    s->tcon.dst_mss, //flags
-    TCP_HEADER_MAX_SIZE, //header size
-    payload, // data to be sent
-    payload_size);
+
+    tcp_send(
+      s->port,
+      s->tcon.dst_port,
+      s->tcon.dst_addr,
+      s->tcon.next_seq,
+      s->tcon.ack_received, // which acknowledgement
+      0,
+      TCP_HEADER_MIN_SIZE,
+      payload,
+      current_payload_size
+    );
 
     s->tcon.next_seq += current_payload_size;
-
   }
-  return 0;
+  return payload_size;
 }
 
 int socketread(struct socket *s, void *dst, int size) {
   if(s->tcon.state != TCP_ESTABLISHED)
     return -1;
-  
+
   if(s->offset == s->end) {
     s->state = SOCKET_WAIT;
     sleepnolock(&ports[s->port]);
-    s->state = SOCKET_BOUND;
+    s->state = SOCKET_CONNECTED;
   }
   int maxbytes = s->end - s->offset;
   int bytes = maxbytes >= size ? size : maxbytes;

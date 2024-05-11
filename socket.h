@@ -6,6 +6,7 @@ enum socket_states {
   SOCKET_UNBOUND,
   SOCKET_BOUND,
   SOCKET_WAIT,
+  SOCKET_CONNECTED,
 };
 
 struct socket {
@@ -22,6 +23,7 @@ struct socket {
 
 struct port {
   int pid;
-  struct socket *socket;
+  struct socket *active_socket;
+  struct socket *passive_socket;
 };
 

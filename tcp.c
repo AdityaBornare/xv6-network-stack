@@ -13,15 +13,8 @@ void tcp_receive(void *tcp_segment, int size, uint dst_ip) {
   struct tcp_packet *rx_pkt = (struct tcp_packet*) tcp_segment;
   ushort port = htons(rx_pkt->header.dst_port);
   uchar flags = rx_pkt->header.flags;
-  struct socket *soc;
+  struct socket *psoc, *asoc;
   int i;
-
-  if(ports[port].pid == -1)
-    return;
-  if((soc = ports[port].socket) == 0)
-    return;
-  if(soc->state == SOCKET_UNBOUND)
-    return;
 
   uint pseudo_ip_sum = 0;
   pseudo_ip_sum += (MYIP & 0xffff) + ((MYIP >> 16) & 0xffff);
@@ -32,50 +25,55 @@ void tcp_receive(void *tcp_segment, int size, uint dst_ip) {
   if(checksum(rx_pkt, size , pseudo_ip_sum) != 0)
     return;
 
-  if((flags & TCP_FLAG_SYN) != 0) {
-    if(soc->tcon.state == TCP_LISTEN) {
+  psoc = ports[port].passive_socket;
+  asoc = ports[port].active_socket;
+
+  if(ports[port].pid == -1)
+    return;
+  if(psoc == 0 && asoc == 0)
+    return;
+
+  if(psoc != 0) {
+    if(psoc->tcon.state == TCP_LISTEN && (flags & TCP_FLAG_SYN) != 0 && !isqueuefull(psoc->waitqueue)) {
       for(i = 0; i < MAX_PENDING_REQUESTS; i++) {
         if(requests[i].client_ip != 0) 
           break;
       }
       requests[i].client_ip = dst_ip;
       memmove(&requests[i].request_packet, rx_pkt, size);
-      enqueue(&soc->waitqueue, (int) &requests[i]);
-
-      if(soc->state == SOCKET_WAIT)
-      wakeup(&ports[port]);
-    }
-
-    else if(soc->tcon.state == TCP_SYN_SENT && (flags & TCP_FLAG_ACK) != 0) {
-      if(soc->tcon.dst_addr != dst_ip || soc->tcon.dst_port != htons(rx_pkt->header.src_port))
-        return;
-      memmove(soc->buffer, rx_pkt, size);
-      wakeup(&ports[port]);
-    }
-    return;
-  }
-
-  if(soc->tcon.state == TCP_SYNACK_SENT && (flags & TCP_FLAG_ACK) != 0) {
-    if(soc->tcon.dst_addr != dst_ip || soc->tcon.dst_port != htons(rx_pkt->header.src_port))
-        return;
-    memmove(soc->buffer, rx_pkt, size);
-    wakeup(&ports[port]);
-    return;
-  }
-
-  if(soc->tcon.state == TCP_ESTABLISHED && (flags & TCP_FLAG_ACK) != 0) {
-    if(soc->tcon.dst_port != htons(rx_pkt->header.src_port))
-      return;
-    if(soc->tcon.ack_sent != htonl(rx_pkt->header.seq_num)) {
-      memmove(soc->buffer + soc->end, rx_pkt + (rx_pkt->header.offset >> 2), size - (rx_pkt->header.offset >> 2));
-      if(soc->state == SOCKET_WAIT)
+      enqueue(&psoc->waitqueue, (int) &requests[i]);
+      if(psoc->state == SOCKET_WAIT)
         wakeup(&ports[port]);
-      // send ack
-      soc->tcon.seq_received = htonl(rx_pkt->header.seq_num);
-      soc->tcon.ack_sent = soc->tcon.seq_received + size - (rx_pkt->header.offset >> 2);
+      return;
     }
-    else {
-      // send ack
+
+    if(psoc->tcon.state == TCP_SYNACK_SENT && (flags & TCP_FLAG_ACK) != 0) {
+      if(psoc->tcon.dst_addr != dst_ip || psoc->tcon.dst_port != htons(rx_pkt->header.src_port))
+        return;
+      memmove(psoc->buffer, rx_pkt, size);
+      wakeup(&ports[port]);
+      return;
+    }
+  }
+
+  if(asoc != 0) {
+    if(asoc->tcon.dst_addr != dst_ip || asoc->tcon.dst_port != htons(rx_pkt->header.src_port))
+      return;
+
+    if(asoc->tcon.state == TCP_SYN_SENT && (flags & TCP_FLAG_ACK) != 0) {
+      memmove(asoc->buffer, rx_pkt, size);
+      wakeup(&ports[port]);
+      return;
+    }
+
+    if(asoc->tcon.state == TCP_ESTABLISHED) {
+      int rx_hdr_size = rx_pkt->header.offset >> 2;
+      memmove(asoc->buffer + asoc->end, ((void*) rx_pkt) + rx_hdr_size, size - rx_hdr_size);
+      asoc->end += size - rx_hdr_size;
+      if(asoc->state == SOCKET_WAIT)
+        wakeup(&ports[port]);
+      asoc->tcon.seq_received = htonl(rx_pkt->header.seq_num);
+      return;
     }
   }
 }

@@ -201,6 +201,7 @@ int             listen(int sockfd);
 int             connect(int sockfd, uint dst_addr, ushort port);
 int             accept(int sockfd);
 int             socketread(struct socket *s, void *dst, int size);
+int             socketwrite(struct socket *s, char *payload, int payload_size);
 
 // string.c
 int             memcmp(const void*, const void*, uint);

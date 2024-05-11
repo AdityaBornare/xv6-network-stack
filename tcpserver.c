@@ -7,5 +7,10 @@ int main() {
   printf(1, "listen = %d\n", listen(fd));
   int a = accept(fd);
   printf(1, "accept = %d\n", a);
+  char buf[10];
+  int bytes = read(a, buf, 9);
+  buf[bytes] = 0;
+  printf(1, "I read %d bytes hehe\n", bytes);
+  printf(1, "I read this: %s\n", buf);
   exit();
 }
