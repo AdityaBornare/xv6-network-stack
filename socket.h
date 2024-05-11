@@ -15,6 +15,8 @@ struct socket {
   struct queue waitqueue;
   char state;
   char *buffer;
+  int offset;
+  int end;
   struct tcp_connection tcon;
 };
 

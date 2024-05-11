@@ -6,6 +6,7 @@ struct pipe;
 struct proc;
 struct queue;
 struct rtcdate;
+struct socket;
 struct spinlock;
 struct sleeplock;
 struct stat;
@@ -199,6 +200,7 @@ int             bind(int sockfd, uint addr, ushort port);
 int             listen(int sockfd);
 int             connect(int sockfd, uint dst_addr, ushort port);
 int             accept(int sockfd);
+int             socketread(struct socket *s, void *dst, int size);
 
 // string.c
 int             memcmp(const void*, const void*, uint);

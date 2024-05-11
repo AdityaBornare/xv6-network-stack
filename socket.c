@@ -39,10 +39,10 @@ struct socket* socketalloc() {
   release(&socklock);
   return 0;
 }
+
 void socketfree(struct socket* s) {
   s->state = SOCKET_FREE;
 }
-
 
 // returns fd on success, -1 on error
 int socket(int type) {
@@ -60,7 +60,6 @@ int socket(int type) {
     return -1;
   }
 
-  memset((void*)s, 0, sizeof(struct socket));
   s->type = type;
   s->buffer = kalloc();
 
@@ -188,10 +187,9 @@ int accept(int sockfd) {
 
   if(sockfd < 0 || sockfd >= NOFILE || (sockfile = myproc()->ofile[sockfd]) == 0)
     return -1;
-
   if(sockfile->type != FD_SOCKET || (s = sockfile->socket) == 0)
-    return -1;
-  
+    return -1; 
+  cprintf("%d\n", sockfd);
   if(s->tcon.state != TCP_LISTEN)
     return -1;
 
@@ -237,13 +235,13 @@ int accept(int sockfd) {
   struct tcp_packet* tcp_res_packet = (struct tcp_packet*) s->buffer;
   s->tcon.ack_received = htons(tcp_res_packet->header.ack_num);
   s->tcon.seq_received = htons(tcp_res_packet->header.seq_num);
+  s->tcon.state = TCP_LISTEN;
   
   int newfd = socket(TCP);
   bind(newfd,  s->addr, s->port);
   struct socket *new_socket = myproc()->ofile[newfd]->socket;
   new_socket->buffer = kalloc();
   new_socket->tcon.state = TCP_ESTABLISHED;
-  memset(&new_socket->tcon, 0, sizeof(struct tcp_connection));
   new_socket->tcon.dst_addr = s->tcon.dst_addr;
   new_socket->tcon.dst_port = s->tcon.dst_port;
   return newfd;
@@ -277,16 +275,22 @@ int socketwrite(struct socket *s, char *payload, int payload_size) {
     s->tcon.next_seq += current_payload_size;
 
   }
-
   return 0;
-//   if size < MSS --> single packet
-//   size // mss + 1 --> no of iterations
-//   size % MSS --> last iteration
-//   
-//   per itearation:
-//   tcp_send() 
-//     create new tcp packet
-//     add header fields (s->tcon)
-//   s->tcon --> update
-//
+}
+
+int socketread(struct socket *s, void *dst, int size) {
+  if(s->tcon.state != TCP_ESTABLISHED)
+    return -1;
+  
+  if(s->offset == s->end) {
+    s->state = SOCKET_WAIT;
+    sleepnolock(&ports[s->port]);
+    s->state = SOCKET_BOUND;
+  }
+  int maxbytes = s->end - s->offset;
+  int bytes = maxbytes >= size ? size : maxbytes;
+
+  memmove(dst, s->buffer + s->offset, bytes);
+  s->offset += bytes;
+  return bytes;
 }
