@@ -247,19 +247,36 @@ int accept(int sockfd) {
   return newfd;
 }
 
-// socketwrite(struct socket *s, char *data, int size) {
-//   check socket state
-//   if size < MSS --> single packet
-//   size // mss + 1 --> no of iterations
-//   size % MSS --> last iteration
-//   
-//   per itearation:
-//   tcp_send() 
-//     create new tcp packet
-//     add header fields (s->tcon)
-//   s->tcon --> update
-//
-// }
+int socketwrite(struct socket *s, char *payload, int payload_size) {
+
+  // check socket state
+  if(s->tcon.state != TCP_ESTABLISHED)
+    return -1;
+
+  s->tcon.next_seq = 0;
+
+  for(int i = 0; i < payload_size/MSS + 1; i++){
+
+    int current_payload_size = MSS;
+
+    if(i == payload_size/MSS)
+      current_payload_size = payload_size % MSS;
+    
+    tcp_send(s->addr, // source port
+    s->tcon.dst_port,
+    s->tcon.dst_addr,
+    s->tcon.next_seq,
+    s->tcon.ack_received, // which acknowledgement
+    s->tcon.dst_mss, //flags
+    TCP_HEADER_MAX_SIZE, //header size
+    payload, // data to be sent
+    payload_size);
+
+    s->tcon.next_seq += current_payload_size;
+
+  }
+  return 0;
+}
 
 int socketread(struct socket *s, void *dst, int size) {
   if(s->tcon.state != TCP_ESTABLISHED)
@@ -277,4 +294,3 @@ int socketread(struct socket *s, void *dst, int size) {
   s->offset += bytes;
   return bytes;
 }
-
