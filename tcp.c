@@ -75,25 +75,35 @@ void tcp_receive(void *tcp_segment, int size, uint dst_ip) {
       asoc->tcon.seq_received = htonl(rx_pkt->header.seq_num);
       return;
     }
+
+    if((flags & TCP_FLAG_ACK) != 0) {
+      uint ack = rx_pkt->header.ack_num;
+      if(ack < asoc->tcon.base_seq || ack > asoc->tcon.seq_sent)
+        return;
+      struct queued_packet *qp = (struct queued_packet *) getfront(asoc->tcon.window);
+      while(!isqueueempty(asoc->tcon.window) && ack >= qp->seq + qp->size) {
+        dequeue(&asoc->tcon.window);
+        asoc->tcon.base_seq += qp->size;
+        qp = (struct queued_packet *) getfront(asoc->tcon.window);
+      } 
+    }
   }
 }
 
-void tcp_send(ushort src_port, ushort dst_port, uint dst_ip, uint seq_num, uint ack_num, uchar flags, uchar hdr_size, void* data, int data_size) {
-  // Construct TCP packet
-  struct tcp_packet packet;
+void tcp_pack(struct tcp_packet *packet, ushort src_port, ushort dst_port, uint dst_ip, uint seq_num, uint ack_num, uchar flags, uchar hdr_size, void* data, int data_size) {
   uint total_size = hdr_size + data_size;
-  packet.header.src_port = htons(src_port);
-  packet.header.dst_port = htons(dst_port);
-  packet.header.seq_num = htonl(seq_num);
-  packet.header.ack_num = htonl(ack_num);
-  packet.header.offset = (hdr_size >> 2) << 4;
-  packet.header.flags = flags;
-  packet.header.window_size = htons(WINDOW_SIZE);
-  packet.header.checksum = 0;
-  packet.header.urgent_ptr = 0;
+  packet->header.src_port = htons(src_port);
+  packet->header.dst_port = htons(dst_port);
+  packet->header.seq_num = htonl(seq_num);
+  packet->header.ack_num = htonl(ack_num);
+  packet->header.offset = (hdr_size >> 2) << 4;
+  packet->header.flags = flags;
+  packet->header.window_size = htons(WINDOW_SIZE);
+  packet->header.checksum = 0;
+  packet->header.urgent_ptr = 0;
 
   // Copy data into packet
-  memmove(packet.options_data, data, data_size);
+  memmove(packet->options_data, data, data_size);
 
   // Calculate TCP header checksum
   int pseudo_ip_sum = 0;
@@ -102,10 +112,78 @@ void tcp_send(ushort src_port, ushort dst_port, uint dst_ip, uint seq_num, uint 
   pseudo_ip_sum += htons((ushort)IP_PROTOCOL_TCP);
   pseudo_ip_sum += htons((ushort)total_size);
 
-  packet.header.checksum = checksum(&packet.header, total_size, pseudo_ip_sum);
+  packet->header.checksum = checksum(&packet->header, total_size, pseudo_ip_sum);
+  return;
+}
+
+void tcp_send(ushort src_port, ushort dst_port, uint dst_ip, uint seq_num, uint ack_num, uchar flags, uchar hdr_size, void* data, int data_size) {
+  struct tcp_packet packet;
+  
+  // Construct TCP packet
+  tcp_pack(&packet, src_port, dst_port, dst_ip, seq_num, ack_num, flags, hdr_size, data, data_size);
+
+  uint total_size = hdr_size + data_size;
 
   // Send packet using IP layer
   ip_send(IP_PROTOCOL_TCP, &packet, MYIP, dst_ip, total_size);
-
   return;
+}
+
+static inline void tcp_resend(struct queued_packet *qp, uint dst_ip) {
+  ip_send(IP_PROTOCOL_TCP, &qp->pkt, MYIP, dst_ip, qp->size);
+}
+
+void tcp_tx(struct socket *s, char *payload, int payload_size) {
+  int i = 0;
+  int window_offset = 0;
+  int num_iter = payload_size / MSS + 1;
+
+  while(i < num_iter) {
+    if(isqueueempty(s->tcon.window)) {
+      int current_payload_size = MSS;
+      if(i == payload_size/MSS)
+        current_payload_size = payload_size % MSS;
+
+      struct tcp_packet pkt;
+      tcp_pack(
+        &pkt,
+        s->port,
+        s->tcon.dst_port,
+        s->tcon.dst_addr,
+        s->tcon.next_seq,
+        0,
+        0,
+        TCP_HEADER_MIN_SIZE,
+        payload,
+        current_payload_size
+      );
+
+      int total_size = TCP_HEADER_MIN_SIZE + current_payload_size;
+
+      s->tcon.pkts[window_offset].size = total_size;
+      s->tcon.pkts[window_offset].seq = s->tcon.next_seq;
+      memmove(&s->tcon.pkts[window_offset].pkt, &pkt, total_size);
+      enqueue(&s->tcon.window, (int) &s->tcon.pkts[window_offset]);
+      window_offset = (window_offset + 1) % WINDOW_LENGTH;
+
+      ip_send(IP_PROTOCOL_TCP, &pkt, MYIP, s->tcon.dst_addr, total_size);
+      s->tcon.seq_sent = s->tcon.next_seq;
+      s->tcon.next_seq += current_payload_size;
+      i++;
+    }
+
+    if(isqueuefull(s->tcon.window)) {
+      while(isqueuefull(s->tcon.window)) {
+        delay(100);
+        tcp_resend((struct queued_packet *) getfront(s->tcon.window), s->tcon.dst_addr);
+      }
+    }
+
+    if(i == num_iter) {
+      while(s->tcon.base_seq != s->tcon.next_seq) {
+        delay(100);
+        tcp_resend((struct queued_packet *) getfront(s->tcon.window), s->tcon.dst_addr);
+      }
+    }
+  }
 }

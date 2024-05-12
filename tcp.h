@@ -1,7 +1,8 @@
 #define TCP_HEADER_MIN_SIZE 20
 #define TCP_HEADER_MAX_SIZE 60
 #define MSS 1460
-#define WINDOW_SIZE (MSS * 4)
+#define WINDOW_LENGTH 10
+#define WINDOW_SIZE (MSS * WINDOW_LENGTH)
 #define MAX_PENDING_REQUESTS 20
 
 // TCP flags
@@ -52,11 +53,20 @@ enum tcp_connection_state
   TCP_ESTABLISHED
 };
 
+struct queued_packet {
+  uint seq;
+  int size;
+  struct tcp_packet pkt;
+};
+
 // TCP connection
 struct tcp_connection {
   int state;
   uint dst_addr;
   ushort dst_port;
+  struct queued_packet pkts[WINDOW_LENGTH];
+  struct queue window;
+  uint base_seq;
   uint seq_sent;
   uint next_seq;
   uint ack_sent;
@@ -65,4 +75,3 @@ struct tcp_connection {
   ushort dst_mss;
   ushort dst_win_size;
 };
-
