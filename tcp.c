@@ -68,12 +68,17 @@ void tcp_receive(void *tcp_segment, int size, uint dst_ip) {
 
     if(asoc->tcon.state == TCP_ESTABLISHED) {
       int rx_hdr_size = rx_pkt->header.offset >> 2;
-      memmove(asoc->buffer + asoc->end, ((void*) rx_pkt) + rx_hdr_size, size - rx_hdr_size);
-      asoc->end += size - rx_hdr_size;
-      if(asoc->state == SOCKET_WAIT)
-        wakeup(&ports[port]);
-      asoc->tcon.seq_received = htonl(rx_pkt->header.seq_num);
-      return;
+
+      if(asoc->tcon.seq_received + 1 == rx_pkt->header.seq_num){
+        memmove(asoc->buffer + asoc->end, ((void*) rx_pkt) + rx_hdr_size, size - rx_hdr_size);
+        asoc->end += size - rx_hdr_size;
+        if(asoc->state == SOCKET_WAIT)
+          wakeup(&ports[port]);
+        asoc->tcon.seq_received = htonl(rx_pkt->header.seq_num);
+        tcp_send_ack(asoc, asoc->tcon.seq_received + 1);
+        
+        return;
+      }
     }
 
     if((flags & TCP_FLAG_ACK) != 0) {
@@ -126,6 +131,23 @@ void tcp_send(ushort src_port, ushort dst_port, uint dst_ip, uint seq_num, uint 
 
   // Send packet using IP layer
   ip_send(IP_PROTOCOL_TCP, &packet, MYIP, dst_ip, total_size);
+  return;
+}
+
+void tcp_send_ack(struct socket* s, int ack){
+
+  tcp_send(
+    s->port,
+    s->tcon.dst_port,
+    s->tcon.dst_addr,
+    s->tcon.next_seq,
+    ack, // acknowledgement to be sent
+    0,
+    TCP_HEADER_MIN_SIZE,
+    0,
+    0
+  );
+
   return;
 }
 
