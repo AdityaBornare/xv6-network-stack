@@ -166,6 +166,7 @@ void            yield(void);
 void initqueue(struct queue *q);
 void enqueue(struct queue *q, int d);
 int dequeue(struct queue *q);
+int getfront(struct queue q);
 int isqueuefull(struct queue q);
 int isqueueempty(struct queue q);
 
@@ -224,6 +225,7 @@ void            syscall(void);
 void            tcp_send(ushort src_port, ushort dst_port, uint dst_ip, uint seq_num, uint ack_num, uchar flags, uchar hdr_size, void* data, int data_size);
 void            tcp_send_ack(struct socket* s, int ack);
 void            tcp_receive(void *tcp_segment, int size, uint dst_ip);
+void            tcp_tx(struct socket *s, char *payload, int payload_size);
 
 // timer.c
 void            timerinit(void);

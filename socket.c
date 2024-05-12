@@ -7,8 +7,8 @@
 #include "file.h"
 #include "mmu.h"
 #include "proc.h"
-#include "tcp.h"
 #include "queue.h"
+#include "tcp.h"
 #include "socket.h"
 
 struct port ports[NPORTS];
@@ -173,7 +173,8 @@ int connect(int sockfd, uint dst_addr, ushort dst_port) {
   // send ack
   tcp_send(s->port, dst_port, dst_addr, s->tcon.ack_received, s->tcon.seq_received + 1, TCP_FLAG_ACK, TCP_HEADER_MIN_SIZE, 0, 0);
 
-  s->tcon.state = TCP_ESTABLISHED; 
+  initqueue(&s->tcon.window);
+  s->tcon.state = TCP_ESTABLISHED;
   return 0;
 }
 
@@ -186,6 +187,8 @@ int accept(int sockfd) {
   if(sockfile->type != FD_SOCKET || (s = sockfile->socket) == 0)
     return -1; 
   if(s->tcon.state != TCP_LISTEN)
+    return -1;
+  if(ports[s->port].active_socket != 0)
     return -1;
 
   if(isqueueempty(s->waitqueue)) {
@@ -249,27 +252,7 @@ int socketwrite(struct socket *s, char *payload, int payload_size) {
   if(s->tcon.state != TCP_ESTABLISHED)
     return -1;
 
-  for(int i = 0; i < payload_size/MSS + 1; i++) {
-
-    int current_payload_size = MSS;
-
-    if(i == payload_size/MSS)
-      current_payload_size = payload_size % MSS;
-
-    tcp_send(
-      s->port,
-      s->tcon.dst_port,
-      s->tcon.dst_addr,
-      s->tcon.next_seq,
-      s->tcon.ack_received, // which acknowledgement
-      0,
-      TCP_HEADER_MIN_SIZE,
-      payload,
-      current_payload_size
-    );
-
-    s->tcon.next_seq += current_payload_size;
-  }
+  tcp_tx(s, payload, payload_size);
   return payload_size;
 }
 
