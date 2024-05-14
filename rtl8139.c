@@ -297,6 +297,7 @@ void nicintr() {
   volatile uint status = nic.regs->ISR;
   while(status) {
     if (status & TxOK) {
+      //cprintf("Tx OK\n");
       status &= TxOK;
       nic.regs->ISR = status;
       nic.cur_tx = (nic.cur_tx + 1) % NUM_TX_DESC;
@@ -309,6 +310,7 @@ void nicintr() {
     }
 
     if (status & RxOK) {
+      //cprintf("Rx OK\n");
       rtl8139_receive();
       status &= RxOK;
       nic.regs->ISR = status;

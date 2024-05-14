@@ -49,5 +49,11 @@ typedef struct icmp_hdr {
     uchar data[0];
 } icmp_hdr;
 
+struct icmp_reply_packet {
+    int size;
+    uint src_ip;
+    ushort seq_no;
+};
+
 #define ICMP_HDR_SIZE		(sizeof(icmp_hdr))
 #define IP_ICMP_HDR_SIZE	(IP_HDR_SIZE + ICMP_HDR_SIZE)

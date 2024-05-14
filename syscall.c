@@ -111,6 +111,10 @@ extern int sys_listen(void);
 extern int sys_connect(void);
 extern int sys_accept(void);
 extern int sys_test(void);
+extern int sys_get_icmp_echo_reply_status(void);
+extern int sys_icmp_send_echo_request(void);
+extern int sys_get_icmp_echo_reply_packet(void);
+
 
 static int (*syscalls[])(void) = {
 [SYS_fork]    sys_fork,
@@ -142,6 +146,9 @@ static int (*syscalls[])(void) = {
 [SYS_connect] sys_connect,
 [SYS_accept]  sys_accept,
 [SYS_test]    sys_test,
+[SYS_get_icmp_echo_reply_status] sys_get_icmp_echo_reply_status,
+[SYS_icmp_send_echo_request]  sys_icmp_send_echo_request,
+[SYS_get_icmp_echo_reply_packet]  sys_get_icmp_echo_reply_packet,
 };
 
 void
