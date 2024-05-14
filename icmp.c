@@ -34,7 +34,7 @@ void icmp_receive(void* icmp_pkt, int pkt_size, uint src_ip) {
 
     default:
       // Unknown ICMP type, handle or log accordingly
-      cprintf("Unknown ICMP type: %d\n", icmp_header->type);
+      // cprintf("Unknown ICMP type: %d\n", icmp_header->type);
       break;
   }
 }
@@ -75,9 +75,9 @@ void icmp_send_echo_request(uint dst_ip, ushort seq_no) {
   }
 
   // Calculate ICMP checksum
-  icmp_header->sum = checksum((ushort*)icmp_header, ICMP_PACKET_SIZE);
+  icmp_header->sum = checksum((ushort*)icmp_header, ICMP_PACKET_SIZE, 0);
 
   // Send ICMP Echo Request packet using IP layer
-  ip_send(IP_PROTOCOL_ICMP, buffer, MY_IP, dst_ip, ICMP_PACKET_SIZE);
+  ip_send(IP_PROTOCOL_ICMP, buffer, MYIP, dst_ip, ICMP_PACKET_SIZE);
 }
 

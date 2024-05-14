@@ -30,6 +30,7 @@ int main(int argc, char *argv[]) {
       if (timeout >= TIMEOUT_MS) {
         printf(1, "Timeout: No ICMP Echo Reply received\n");
         received = 0;
+        sleep(100);
         break;
       }
       timeout++;
@@ -50,6 +51,7 @@ int main(int argc, char *argv[]) {
     get_icmp_echo_reply_packet();
     printf(1, "time=%d ms\n", response_time_ms);
     pkt_no++;
+    sleep(100);
   }
   int packet_loss = ((MAX_PACKETS - pkt_responsed)/MAX_PACKETS) * 100;
   printf(1, "--- %s ping statistics ---\n", argv[1]);
