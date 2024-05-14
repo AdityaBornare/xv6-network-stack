@@ -1,8 +1,10 @@
 #define TCP_HEADER_MIN_SIZE 20
 #define TCP_HEADER_MAX_SIZE 60
 #define MSS 1460
-#define WINDOW_SIZE (MSS * 4)
+#define WINDOW_LENGTH 10
+#define WINDOW_SIZE (MSS * WINDOW_LENGTH)
 #define MAX_PENDING_REQUESTS 20
+#define INITIAL_SEQ 0
 
 // TCP flags
 #define TCP_FLAG_FIN  0x01  
@@ -37,29 +39,39 @@ struct tcp_mss_option {
   ushort mss;
 };
 
+struct tcp_request {
+  uint client_ip;
+  struct tcp_packet request_packet;
+};
+
 // TCP connection states
-enum tcp_ca_state
+enum tcp_connection_state
 {
-  TCP_CA_Open = 0,
-  TCP_CA_Disorder = 1,
-  TCP_CA_CWR = 2,
-  TCP_CA_Recovery = 3,
-  TCP_CA_Loss = 4
+  TCP_CLOSED,
+  TCP_LISTEN,
+  TCP_SYN_SENT,
+  TCP_SYNACK_SENT,
+  TCP_ESTABLISHED
+};
+
+struct queued_packet {
+  uint seq;
+  int size;
+  struct tcp_packet pkt;
 };
 
 // TCP connection
 struct tcp_connection {
+  int state;
   uint dst_addr;
   ushort dst_port;
-  uint seq_sent;
+  struct queued_packet pkts[WINDOW_LENGTH];
+  struct queue window;
+  uint base_seq;
+  uint next_seq;
   uint ack_sent;
   uint seq_received;
   uint ack_received;
   ushort dst_mss;
   ushort dst_win_size;
-};
-
-struct tcp_request {
-  uint client_ip;
-  struct tcp_packet request_packet;
 };

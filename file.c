@@ -90,6 +90,8 @@ fileclose(struct file *f)
 
   if(ff.type == FD_PIPE)
     pipeclose(ff.pipe, ff.writable);
+  if(ff.type == FD_SOCKET)
+    socketclose(ff.socket);
   else if(ff.type == FD_INODE){
     begin_op();
     iput(ff.ip);
@@ -120,6 +122,8 @@ fileread(struct file *f, char *addr, int n)
     return -1;
   if(f->type == FD_PIPE)
     return piperead(f->pipe, addr, n);
+  if(f->type == FD_SOCKET)
+    return socketread(f->socket, addr, n);
   if(f->type == FD_INODE){
     ilock(f->ip);
     if((r = readi(f->ip, addr, f->off, n)) > 0)
@@ -141,6 +145,8 @@ filewrite(struct file *f, char *addr, int n)
     return -1;
   if(f->type == FD_PIPE)
     return pipewrite(f->pipe, addr, n);
+  if(f->type == FD_SOCKET)
+    return socketwrite(f->socket, addr, n);
   if(f->type == FD_INODE){
     // write a few blocks at a time to avoid exceeding
     // the maximum log transaction size, including

@@ -6,6 +6,7 @@ struct pipe;
 struct proc;
 struct queue;
 struct rtcdate;
+struct socket;
 struct spinlock;
 struct sleeplock;
 struct stat;
@@ -85,7 +86,7 @@ extern uchar    ioapicid;
 void            ioapicinit(void);
 
 // ip.c
-extern uint     MY_IP;
+extern uint     MYIP;
 extern uint     NETMASK;
 extern uint     GATEWAY;
 void            ip_init();
@@ -125,7 +126,7 @@ void            netinit();
 ushort          htons(ushort n);
 uint            htonl(uint n);
 uint            inet_addr(char ip_str[]);
-ushort          checksum(void *data, int length);
+ushort          checksum(void *data, int length, uint start);
 
 // pci.c
 uint            read_pci_config_register(uchar bus, uchar device, uchar function, uchar offset);
@@ -166,6 +167,7 @@ void            yield(void);
 void initqueue(struct queue *q);
 void enqueue(struct queue *q, int d);
 int dequeue(struct queue *q);
+int getfront(struct queue q);
 int isqueuefull(struct queue q);
 int isqueueempty(struct queue q);
 
@@ -194,11 +196,15 @@ void            initsleeplock(struct sleeplock*, char*);
 
 // socket.c
 void            portinit();
+void            socketinit();
 int             socket();
 int             bind(int sockfd, uint addr, ushort port);
 int             listen(int sockfd);
 int             connect(int sockfd, uint dst_addr, ushort port);
 int             accept(int sockfd);
+int             socketread(struct socket *s, void *dst, int size);
+int             socketwrite(struct socket *s, char *payload, int payload_size);
+void            socketclose(struct socket *s);
 
 // string.c
 int             memcmp(const void*, const void*, uint);
@@ -219,7 +225,11 @@ void            syscall(void);
 
 // tcp.c
 void            tcp_send(ushort src_port, ushort dst_port, uint dst_ip, uint seq_num, uint ack_num, uchar flags, uchar hdr_size, void* data, int data_size);
+void            tcp_send_syn(struct socket *s);
+void            tcp_send_synack(struct socket *s);
+void            tcp_send_ack(struct socket* s, int ack);
 void            tcp_receive(void *tcp_segment, int size, uint dst_ip);
+void            tcp_tx(struct socket *s, char *payload, int payload_size);
 
 // timer.c
 void            timerinit(void);
@@ -236,7 +246,7 @@ void            uartintr(void);
 void            uartputc(int);
 
 // utils.c
-void            delay(uint milliseconds);
+void            delay(uint);
 
 // vm.c
 void            seginit(void);

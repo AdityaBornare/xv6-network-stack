@@ -304,7 +304,6 @@ void nicintr() {
     }
 
     if (status & TxErr) {
-      cprintf("Transmission Error\n");
       status &= TxErr;
       nic.regs->ISR = status;
       rtl8139_reset();
@@ -318,7 +317,6 @@ void nicintr() {
     }
 
     if (status & RxErr) {
-      cprintf("Reception Error\n");
       status &= RxErr;
       nic.regs->ISR = status;
       rtl8139_reset();

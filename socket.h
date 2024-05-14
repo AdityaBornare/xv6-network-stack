@@ -2,13 +2,11 @@
 
 // socket states
 enum socket_states {
+  SOCKET_FREE,
   SOCKET_UNBOUND,
   SOCKET_BOUND,
-  SOCKET_LISTENING,
-  SOCKET_ACCEPTING,
-  SOCKET_CONNECTING,
-  SOCKET_WAITING_FOR_ACK,
-  SOCKET_CONNECTED
+  SOCKET_WAIT,
+  SOCKET_CONNECTED,
 };
 
 struct socket {
@@ -18,11 +16,14 @@ struct socket {
   struct queue waitqueue;
   char state;
   char *buffer;
+  int offset;
+  int end;
   struct tcp_connection tcon;
 };
 
 struct port {
   int pid;
-  struct socket *socket;
+  struct socket *active_socket;
+  struct socket *passive_socket;
 };
 
