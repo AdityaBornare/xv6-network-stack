@@ -297,28 +297,24 @@ void nicintr() {
   volatile uint status = nic.regs->ISR;
   while(status) {
     if (status & TxOK) {
-      cprintf("Tx OK\n");
       status &= TxOK;
       nic.regs->ISR = status;
       nic.cur_tx = (nic.cur_tx + 1) % NUM_TX_DESC;
     }
 
     if (status & TxErr) {
-      cprintf("Transmission Error\n");
       status &= TxErr;
       nic.regs->ISR = status;
       rtl8139_reset();
     }
 
     if (status & RxOK) {
-      cprintf("Rx OK\n");
       rtl8139_receive();
       status &= RxOK;
       nic.regs->ISR = status;
     }
 
     if (status & RxErr) {
-      cprintf("Reception Error\n");
       status &= RxErr;
       nic.regs->ISR = status;
       rtl8139_reset();

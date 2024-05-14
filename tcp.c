@@ -1,5 +1,7 @@
 #include "types.h"
 #include "defs.h"
+#include "param.h"
+#include "spinlock.h"
 #include "queue.h"
 #include "tcp.h"
 #include "socket.h"
@@ -23,6 +25,8 @@ void tcp_receive(void *tcp_segment, int size, uint dst_ip) {
   pseudo_ip_sum += htons(size);
 
   if(checksum(rx_pkt, size , pseudo_ip_sum) != 0)
+    return;
+  if(port >= NPORTS)
     return;
 
   psoc = ports[port].passive_socket;
@@ -50,7 +54,8 @@ void tcp_receive(void *tcp_segment, int size, uint dst_ip) {
     if(psoc->tcon.state == TCP_SYNACK_SENT && (flags & TCP_FLAG_ACK) != 0) {
       if(psoc->tcon.dst_addr != dst_ip || psoc->tcon.dst_port != htons(rx_pkt->header.src_port))
         return;
-      memmove(psoc->buffer, rx_pkt, size);
+      psoc->tcon.ack_received = htonl(rx_pkt->header.ack_num);
+      psoc->tcon.seq_received = htonl(rx_pkt->header.seq_num);
       wakeup(&ports[port]);
       return;
     }
@@ -74,11 +79,12 @@ void tcp_receive(void *tcp_segment, int size, uint dst_ip) {
         struct queued_packet *qp = (struct queued_packet *) getfront(asoc->tcon.window);
         while(!isqueueempty(asoc->tcon.window) && ack >= (qp->seq + qp->size - TCP_HEADER_MIN_SIZE)) {
           dequeue(&asoc->tcon.window);
-          asoc->tcon.base_seq += qp->size;
+          asoc->tcon.base_seq += qp->size - (qp->pkt.header.offset >> 2);
           qp = (struct queued_packet *) getfront(asoc->tcon.window);
         }
         return;
       }
+
       int rx_hdr_size = rx_pkt->header.offset >> 2;
       if(asoc->tcon.ack_sent == htonl(rx_pkt->header.seq_num)) {
         memmove(asoc->buffer + asoc->end, ((void*) rx_pkt) + rx_hdr_size, size - rx_hdr_size);
@@ -88,7 +94,6 @@ void tcp_receive(void *tcp_segment, int size, uint dst_ip) {
         asoc->tcon.seq_received = htonl(rx_pkt->header.seq_num);
         uint ack = asoc->tcon.seq_received + (size - rx_hdr_size);
         tcp_send_ack(asoc, ack);
-        asoc->tcon.ack_sent = ack;
       }
       else {
         tcp_send_ack(asoc, asoc->tcon.ack_sent);
@@ -177,14 +182,13 @@ void tcp_send_ack(struct socket* s, int ack) {
     s->port,
     s->tcon.dst_port,
     s->tcon.dst_addr,
-    s->tcon.next_seq,
+    s->tcon.next_seq - 1,
     ack, // acknowledgement to be sent
     TCP_FLAG_ACK,
     TCP_HEADER_MIN_SIZE,
     0,
     0
   );
-  return;
 
   s->tcon.ack_sent = ack;
 }
@@ -197,6 +201,7 @@ void tcp_tx(struct socket *s, char *payload, int payload_size) {
   int i = 0;
   int window_offset = 0;
   int num_iter = payload_size / MSS + 1;
+  int qp;
 
   while(i < num_iter) {
     if(!isqueuefull(s->tcon.window)) {
@@ -233,18 +238,18 @@ void tcp_tx(struct socket *s, char *payload, int payload_size) {
 
     while(isqueuefull(s->tcon.window)) {
       delay(100);
-      if(isqueuefull(s->tcon.window))
-        break;
-      tcp_resend((struct queued_packet *) getfront(s->tcon.window), s->tcon.dst_addr);
+      qp = getfront(s->tcon.window);
+      if(isqueuefull(s->tcon.window) && qp != 0)
+        tcp_resend((struct queued_packet*) qp, s->tcon.dst_addr);
     }
 
 
     if(i == num_iter) {
       while(s->tcon.base_seq != s->tcon.next_seq) {
         delay(100);
-        if(s->tcon.base_seq != s->tcon.next_seq)
-          break;
-        tcp_resend((struct queued_packet *) getfront(s->tcon.window), s->tcon.dst_addr);
+        qp =  getfront(s->tcon.window);
+        if(s->tcon.base_seq != s->tcon.next_seq && qp != 0)
+          tcp_resend((struct queued_packet*) qp, s->tcon.dst_addr);
       }
     }
   }

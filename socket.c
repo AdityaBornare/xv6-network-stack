@@ -132,7 +132,7 @@ int connect(int sockfd, uint dst_addr, ushort dst_port) {
   int i;
 
   acquire(&portlock);
-  for(i = 0; i < NPORTS; i++) {
+  for(i = 1024; i < NPORTS; i++) {
     if(ports[i].pid == -1) {
       ports[i].pid = myproc()->pid;
       ports[i].active_socket = s;
@@ -166,11 +166,11 @@ int connect(int sockfd, uint dst_addr, ushort dst_port) {
 
   s->tcon.ack_received = htonl(tcp_reply_packet->header.ack_num);
   s->tcon.seq_received = htonl(tcp_reply_packet->header.seq_num);
-
-  // send ack
-  tcp_send(s->port, dst_port, dst_addr, s->tcon.ack_received, s->tcon.seq_received + 1, TCP_FLAG_ACK, TCP_HEADER_MIN_SIZE,  0, 0);
   s->tcon.base_seq = s->tcon.ack_received;
   s->tcon.next_seq = s->tcon.ack_received;
+
+  // send ack
+  tcp_send_ack(s, s->tcon.seq_received + 1);
   initqueue(&s->tcon.window);
   s->tcon.state = TCP_ESTABLISHED;
   return 0;
@@ -199,7 +199,6 @@ int accept(int sockfd) {
   struct tcp_packet* tcp_req_packet = &request->request_packet;
   s->tcon.dst_addr = request->client_ip;
   s->tcon.dst_port = htons(tcp_req_packet->header.src_port);
-  s->tcon.ack_received = htonl(tcp_req_packet->header.ack_num);
   s->tcon.seq_received = htonl(tcp_req_packet->header.seq_num);
 
   tcp_send_synack(s);
@@ -209,9 +208,9 @@ int accept(int sockfd) {
   sleepnolock(&ports[s->port]);
 
   // find reply in buffer, extract, update tcon
-  struct tcp_packet* tcp_res_packet = (struct tcp_packet*) s->buffer;
-  s->tcon.ack_received = htons(tcp_res_packet->header.ack_num);
-  s->tcon.seq_received = htons(tcp_res_packet->header.seq_num);
+  // struct tcp_packet* tcp_res_packet = (struct tcp_packet*) s->buffer;
+  // s->tcon.ack_received = htons(tcp_res_packet->header.ack_num);
+  // s->tcon.seq_received = htons(tcp_res_packet->header.seq_num);
   s->tcon.state = TCP_LISTEN;
   
   int newfd = socket(TCP);
@@ -224,8 +223,8 @@ int accept(int sockfd) {
   new_socket->tcon.dst_port = s->tcon.dst_port;
   new_socket->tcon.ack_received = s->tcon.ack_received;
   new_socket->tcon.seq_received = s->tcon.seq_received;
-  new_socket->tcon.base_seq = INITIAL_SEQ + 1;
-  new_socket->tcon.next_seq = INITIAL_SEQ + 1;
+  new_socket->tcon.base_seq = s->tcon.ack_received;
+  new_socket->tcon.next_seq = s->tcon.ack_received;
   new_socket->tcon.ack_sent = s->tcon.ack_sent;
   initqueue(&new_socket->tcon.window);
   new_socket->tcon.state = TCP_ESTABLISHED;
@@ -265,8 +264,11 @@ void socketclose(struct socket *s) {
   socketfree(s);
 
   acquire(&portlock);
-  if(ports[port].active_socket == s)
+  if(ports[port].active_socket == s) {
     ports[port].active_socket = 0;
+    if(ports[port].passive_socket == 0)
+      ports[port].pid = -1;
+  }
   else if(ports[port].passive_socket == s) {
     ports[port].passive_socket = 0;
     ports[port].pid = -1;
