@@ -8,6 +8,7 @@ int main() {
   char buf[] = "hello";
   printf(1, "I am writing...\n");
   write(fd, buf, 5);
-  printf(1, "I wrote %s\n", buf); 
+  printf(1, "I wrote %s\n", buf);
+  close(fd); 
   exit();
 }

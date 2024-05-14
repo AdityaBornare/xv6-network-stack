@@ -12,5 +12,7 @@ int main() {
   buf[bytes] = 0;
   printf(1, "I read %d bytes hehe\n", bytes);
   printf(1, "I read this: %s\n", buf);
+  close(a);
+  close(fd);
   exit();
 }

@@ -203,6 +203,7 @@ int             connect(int sockfd, uint dst_addr, ushort port);
 int             accept(int sockfd);
 int             socketread(struct socket *s, void *dst, int size);
 int             socketwrite(struct socket *s, char *payload, int payload_size);
+void            socketclose(struct socket *s);
 
 // string.c
 int             memcmp(const void*, const void*, uint);
@@ -223,6 +224,8 @@ void            syscall(void);
 
 // tcp.c
 void            tcp_send(ushort src_port, ushort dst_port, uint dst_ip, uint seq_num, uint ack_num, uchar flags, uchar hdr_size, void* data, int data_size);
+void            tcp_send_syn(struct socket *s);
+void            tcp_send_synack(struct socket *s);
 void            tcp_send_ack(struct socket* s, int ack);
 void            tcp_receive(void *tcp_segment, int size, uint dst_ip);
 void            tcp_tx(struct socket *s, char *payload, int payload_size);

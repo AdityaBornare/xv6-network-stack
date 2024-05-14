@@ -90,6 +90,8 @@ fileclose(struct file *f)
 
   if(ff.type == FD_PIPE)
     pipeclose(ff.pipe, ff.writable);
+  if(ff.type == FD_SOCKET)
+    socketclose(ff.socket);
   else if(ff.type == FD_INODE){
     begin_op();
     iput(ff.ip);

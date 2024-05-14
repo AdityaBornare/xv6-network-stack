@@ -41,7 +41,9 @@ struct socket* socketalloc() {
 }
 
 void socketfree(struct socket* s) {
+  acquire(&socklock);
   s->state = SOCKET_FREE;
+  release(&socklock);
 }
 
 // returns fd on success, -1 on error
@@ -154,15 +156,10 @@ int connect(int sockfd, uint dst_addr, ushort dst_port) {
   s->tcon.dst_addr = dst_addr;
   s->tcon.dst_port = dst_port;
 
-  struct tcp_mss_option mss;
-  mss.kind = 2;
-  mss.length = 4;
-  mss.mss = htons(MSS);
-
-  tcp_send(s->port, dst_port, dst_addr, 0, 0, TCP_FLAG_SYN, TCP_HEADER_MIN_SIZE + mss.length, &mss, mss.length);
-  s->tcon.state = TCP_SYN_SENT;
+  tcp_send_syn(s);
 
   // wait for reply
+  s->tcon.state = TCP_SYN_SENT;
   sleepnolock(&ports[s->port]);
 
   struct tcp_packet* tcp_reply_packet = (struct tcp_packet*) s->buffer;
@@ -171,8 +168,9 @@ int connect(int sockfd, uint dst_addr, ushort dst_port) {
   s->tcon.seq_received = htonl(tcp_reply_packet->header.seq_num);
 
   // send ack
-  tcp_send(s->port, dst_port, dst_addr, s->tcon.ack_received, s->tcon.seq_received + 1, TCP_FLAG_ACK, TCP_HEADER_MIN_SIZE, 0, 0);
-
+  tcp_send(s->port, dst_port, dst_addr, s->tcon.ack_received, s->tcon.seq_received + 1, TCP_FLAG_ACK, TCP_HEADER_MIN_SIZE,  0, 0);
+  s->tcon.base_seq = s->tcon.ack_received;
+  s->tcon.next_seq = s->tcon.ack_received;
   initqueue(&s->tcon.window);
   s->tcon.state = TCP_ESTABLISHED;
   return 0;
@@ -204,27 +202,8 @@ int accept(int sockfd) {
   s->tcon.ack_received = htonl(tcp_req_packet->header.ack_num);
   s->tcon.seq_received = htonl(tcp_req_packet->header.seq_num);
 
-  struct tcp_mss_option mss;
-  mss.kind = 2;
-  mss.length = 4;
-  mss.mss = htons(MSS);
-
-  // send syn ack, update tcon
-  tcp_send(
-    s->port,
-    s->tcon.dst_port,
-    s->tcon.dst_addr,
-    0,
-    s->tcon.seq_received + 1,
-    TCP_FLAG_SYN | TCP_FLAG_ACK,
-    TCP_HEADER_MIN_SIZE + mss.length,
-    &mss,
-    mss.length
-  );
-
-  s->tcon.ack_sent = s->tcon.seq_received + 1;
-  s->tcon.seq_sent = 0;
-  
+  tcp_send_synack(s);
+ 
   // wait for ack (sleep)
   s->tcon.state = TCP_SYNACK_SENT;
   sleepnolock(&ports[s->port]);
@@ -243,6 +222,12 @@ int accept(int sockfd) {
   new_socket->state = SOCKET_CONNECTED; 
   new_socket->tcon.dst_addr = s->tcon.dst_addr;
   new_socket->tcon.dst_port = s->tcon.dst_port;
+  new_socket->tcon.ack_received = s->tcon.ack_received;
+  new_socket->tcon.seq_received = s->tcon.seq_received;
+  new_socket->tcon.base_seq = INITIAL_SEQ + 1;
+  new_socket->tcon.next_seq = INITIAL_SEQ + 1;
+  new_socket->tcon.ack_sent = s->tcon.ack_sent;
+  initqueue(&new_socket->tcon.window);
   new_socket->tcon.state = TCP_ESTABLISHED;
   return newfd;
 }
@@ -271,4 +256,20 @@ int socketread(struct socket *s, void *dst, int size) {
   memmove(dst, s->buffer + s->offset, bytes);
   s->offset += bytes;
   return bytes;
+}
+
+void socketclose(struct socket *s) {
+  int port = s->port;
+  kfree(s->buffer);
+  memset(s, 0, sizeof(struct socket));
+  socketfree(s);
+
+  acquire(&portlock);
+  if(ports[port].active_socket == s)
+    ports[port].active_socket = 0;
+  else if(ports[port].passive_socket == s) {
+    ports[port].passive_socket = 0;
+    ports[port].pid = -1;
+  }
+  release(&portlock);
 }

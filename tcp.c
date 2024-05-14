@@ -65,7 +65,6 @@ void tcp_receive(void *tcp_segment, int size, uint dst_ip) {
       wakeup(&ports[port]);
       return;
     }
-
     if(asoc->tcon.state == TCP_ESTABLISHED) {
       if((flags & TCP_FLAG_ACK) != 0) {
         uint ack = htonl(rx_pkt->header.ack_num);
@@ -80,9 +79,7 @@ void tcp_receive(void *tcp_segment, int size, uint dst_ip) {
         }
         return;
       }
-
       int rx_hdr_size = rx_pkt->header.offset >> 2;
-
       if(asoc->tcon.ack_sent == htonl(rx_pkt->header.seq_num)) {
         memmove(asoc->buffer + asoc->end, ((void*) rx_pkt) + rx_hdr_size, size - rx_hdr_size);
         asoc->end += size - rx_hdr_size;
@@ -140,6 +137,41 @@ void tcp_send(ushort src_port, ushort dst_port, uint dst_ip, uint seq_num, uint 
   return;
 }
 
+void tcp_send_syn(struct socket *s) {
+  struct tcp_mss_option mss;
+  mss.kind = 2;
+  mss.length = 4;
+  mss.mss = htons(MSS);
+
+  tcp_send(s->port, s->tcon.dst_port, s->tcon.dst_addr, INITIAL_SEQ, 0, TCP_FLAG_SYN, TCP_HEADER_MIN_SIZE + mss.length, &mss, mss.length);
+  s->tcon.base_seq = INITIAL_SEQ + 1;
+  s->tcon.next_seq = INITIAL_SEQ + 1;
+}
+
+void tcp_send_synack(struct socket *s) {
+  struct tcp_mss_option mss;
+  mss.kind = 2;
+  mss.length = 4;
+  mss.mss = htons(MSS);
+
+  // send syn ack, update tcon
+  tcp_send(
+    s->port,
+    s->tcon.dst_port,
+    s->tcon.dst_addr,
+    INITIAL_SEQ,
+    s->tcon.seq_received + 1,
+    TCP_FLAG_SYN | TCP_FLAG_ACK,
+    TCP_HEADER_MIN_SIZE + mss.length,
+    &mss,
+    mss.length
+  );
+
+  s->tcon.ack_sent = s->tcon.seq_received + 1;
+  s->tcon.base_seq = INITIAL_SEQ + 1;
+  s->tcon.next_seq = INITIAL_SEQ + 1;
+}
+
 void tcp_send_ack(struct socket* s, int ack) {
   tcp_send(
     s->port,
@@ -152,8 +184,9 @@ void tcp_send_ack(struct socket* s, int ack) {
     0,
     0
   );
-
   return;
+
+  s->tcon.ack_sent = ack;
 }
 
 static inline void tcp_resend(struct queued_packet *qp, uint dst_ip) {
@@ -194,18 +227,17 @@ void tcp_tx(struct socket *s, char *payload, int payload_size) {
       window_offset = (window_offset + 1) % WINDOW_LENGTH;
 
       ip_send(IP_PROTOCOL_TCP, &pkt, MYIP, s->tcon.dst_addr, total_size);
-      s->tcon.seq_sent = s->tcon.next_seq;
       s->tcon.next_seq += current_payload_size;
       i++;
     }
-    if(isqueuefull(s->tcon.window)) {
-      while(isqueuefull(s->tcon.window)) {
-        delay(100);
-        if(isqueuefull(s->tcon.window))
-          break;
-        tcp_resend((struct queued_packet *) getfront(s->tcon.window), s->tcon.dst_addr);
-      }
+
+    while(isqueuefull(s->tcon.window)) {
+      delay(100);
+      if(isqueuefull(s->tcon.window))
+        break;
+      tcp_resend((struct queued_packet *) getfront(s->tcon.window), s->tcon.dst_addr);
     }
+
 
     if(i == num_iter) {
       while(s->tcon.base_seq != s->tcon.next_seq) {

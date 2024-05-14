@@ -4,6 +4,7 @@
 #define WINDOW_LENGTH 10
 #define WINDOW_SIZE (MSS * WINDOW_LENGTH)
 #define MAX_PENDING_REQUESTS 20
+#define INITIAL_SEQ 0
 
 // TCP flags
 #define TCP_FLAG_FIN  0x01  
@@ -67,7 +68,6 @@ struct tcp_connection {
   struct queued_packet pkts[WINDOW_LENGTH];
   struct queue window;
   uint base_seq;
-  uint seq_sent;
   uint next_seq;
   uint ack_sent;
   uint seq_received;
